@@ -12,6 +12,7 @@
 - Fix global `--json` routing so `dev.kit --json <command>` reaches the requested command instead of falling back to home output
 - Add machine-readable JSON output for `dev.kit uninstall --json --yes`
 - Ignore exported Copilot session transcripts so local session history does not leak into release diffs
+- Add a repo-owned workflow reference doc for developer and agent best practices tied to `dev.kit` commands
 
 ### 0.9.0
 

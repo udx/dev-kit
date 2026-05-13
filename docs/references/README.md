@@ -7,6 +7,7 @@ Use this directory for compact reference material that helps interpret repo cont
 - command and workflow contract surfaces
 - config contract surfaces
 - dependency contract boundaries
+- agent and developer workflow practices
 
 These files are not generated output and not repo-specific app docs.
 

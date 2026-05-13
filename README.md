@@ -182,6 +182,7 @@ All commands support `--json`.
 - [Smart Dependency Detection](docs/smart-dependency-detection.md)
 - [Reference Docs](docs/references/README.md)
 - [Reference: Command and Workflow Surfaces](docs/references/command-surfaces.md)
+- [Reference: Agent and Developer Workflow](docs/references/agent-dev-workflow.md)
 - [Installation](docs/installation.md)
 
 ## Testing
