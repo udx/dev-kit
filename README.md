@@ -99,6 +99,7 @@ Use those files for consumer behavior rules and team-specific operating guidance
 This repo is intentionally split by responsibility:
 
 - `src/configs/` configures `dev.kit` detection, gap rules, context sections, and other module inputs
+- scripts, workflows, and YAML manifests are the programmatic execution layer
 - `docs/` documents `dev.kit` behavior, repo-context boundaries, workflow, and outputs
 - `docs/references/` is a small knowledgebase for developers and agents when gaps or contract surfaces need interpretation
 - `tests/` validates command flow, generated context, and user-facing outputs

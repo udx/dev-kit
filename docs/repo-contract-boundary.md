@@ -13,6 +13,13 @@ Use **repo-owned docs and assets** for durable human meaning:
 - manifest metadata such as `kind`, `description`, and `version`
 - workflow and deploy docs near the repo assets they explain
 
+Use **scripts and manifests** for programmatic execution:
+
+- `Makefile`, `package.json`, and shell scripts
+- `.github/workflows/*.yml`
+- deploy manifests such as `deploy.yml`
+- checked-in config examples when they are part of the runnable contract
+
 Use **`.rabbit/context.yaml`** for generated operational summary:
 
 - direct-read refs
@@ -28,6 +35,8 @@ If a repo needs explanation, examples, or repair guidance, prefer fixing the rep
 That source asset may be a reference doc that later gets normalized into `AGENTS.md` if the repo prefers a dedicated instruction surface.
 
 If a repo needs a compact generated summary for tooling or safe repo-scoped execution, put it in `.rabbit/context.yaml`.
+
+If a repo needs something to be executed safely by tools, keep that in a script or manifest rather than only in prose docs.
 
 ## Repair loop
 

@@ -15,7 +15,8 @@ Commands are often packaged in:
 - `Dockerfile`
 - deploy manifests
 - GitHub workflows
-- repo docs when a command is intentionally documented rather than declared in a manifest
+
+For **programmatic execution**, prefer scripts, package manifests, make targets, workflows, or deploy YAML over prose docs.
 
 ## Common workflow surfaces
 
@@ -26,6 +27,8 @@ Workflow and operational contracts are often packaged in:
 - Docker build and runtime files
 - deploy manifests such as `deploy.yml`
 - repo docs that explain how those assets fit together
+
+Docs should explain execution behavior, tradeoffs, and decision points. The runnable contract should stay in scripts and manifests.
 
 ## Build and deploy may be separate
 
@@ -62,7 +65,7 @@ Instead it should:
 
 1. detect the strongest repo-owned source
 2. record where the command or workflow was found
-3. prefer declared surfaces over guessed ones
+3. prefer runnable scripts and manifests over guessed or prose-only surfaces
 4. point gaps back to the repo asset that should become clearer
 
 ## Example

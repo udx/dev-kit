@@ -20,7 +20,8 @@ If a repo prefers a normalized `AGENTS.md`, this document can act as the source 
 - treat `.rabbit/context.yaml` as generated evidence, not hand-authored guidance
 - keep workflow guidance in repo-owned docs such as `docs/references/`
 - when a gap appears, patch the owning repo asset and rerun `dev.kit repo`
-- use docs to explain intent; use manifests and scripts to declare execution
+- use scripts and YAML manifests for programmatic execution
+- use docs for developer and agent behavior, decision rules, and smart-search guidance
 
 ## Question and answer examples
 
@@ -35,6 +36,9 @@ If a repo prefers a normalized `AGENTS.md`, this document can act as the source 
 
 **Question:** Where should best practices live?  
 **Answer:** In repo-owned docs like this file; they can also be normalized into `AGENTS.md` when the repo prefers that surface.
+
+**Question:** Where should executable workflow live?  
+**Answer:** In scripts, package manifests, workflows, or deploy YAML, not only in prose docs.
 
 **Question:** When should GitHub data be fetched live?  
 **Answer:** Only when the current task needs issues, PRs, reviews, workflow runs, or alerts.
