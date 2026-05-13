@@ -179,7 +179,7 @@ dev_kit_repo_is_contract_evidence_path() {
   local path="$1"
 
   case "$path" in
-    ""|.git/*|.rabbit/context.yaml|AGENTS.md|.udx/*|.claude/*|.copilot/*|.cursor/*)
+    ""|.git/*|.rabbit/context.yaml|.rabbit/dev.kit/*|AGENTS.md|.udx/*|.claude/*|.copilot/*|.cursor/*)
       return 1
       ;;
   esac

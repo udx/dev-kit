@@ -6,7 +6,7 @@ generator:
   tool: dev.kit
   repo: https://github.com/udx/dev.kit
   version: 0.10.0
-  generated_at: 2026-05-13T00:40:49Z
+  generated_at: 2026-05-13T00:48:39Z
 
 repo:
   name: dev.kit
@@ -145,8 +145,6 @@ manifests:
     declared_as: udx.io/worker-v1/deploy
     source_repo: udx/worker
     used_by:
-      - .rabbit/dev.kit/lessons-dev.kit-2026-04-14.md
-      - .rabbit/dev.kit/lessons-dev.kit-2026-04-15.md
       - Makefile
       - docs/references/command-surfaces.md
       - docs/references/config-contract-surfaces.md
@@ -157,8 +155,6 @@ manifests:
       - tests/suite.sh
     evidence:
       - version: udx.io/worker-v1/deploy
-      - path reference: .rabbit/dev.kit/lessons-dev.kit-2026-04-14.md
-      - path reference: .rabbit/dev.kit/lessons-dev.kit-2026-04-15.md
       - path reference: Makefile
       - path reference: docs/references/command-surfaces.md
       - path reference: docs/references/config-contract-surfaces.md

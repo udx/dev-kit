@@ -125,6 +125,48 @@ dev_kit_spinner_notice() {
   printf '  - %s\n' "$message" >&2
 }
 
+dev_kit_process_descendants() {
+  local root_pid="$1"
+
+  ps -eo pid=,ppid= | awk -v root="$root_pid" '
+    {
+      pid = $1
+      ppid = $2
+      children[ppid] = children[ppid] " " pid
+    }
+
+    function walk(node, list, count, idx) {
+      count = split(children[node], list, " ")
+      for (idx = 1; idx <= count; idx++) {
+        if (list[idx] == "") {
+          continue
+        }
+        walk(list[idx])
+        print list[idx]
+      }
+    }
+
+    END {
+      walk(root)
+    }
+  '
+}
+
+dev_kit_process_signal_tree() {
+  local signal="$1"
+  local root_pid="$2"
+  local child_pid=""
+
+  while IFS= read -r child_pid; do
+    [ -n "$child_pid" ] || continue
+    kill "-${signal}" "$child_pid" 2>/dev/null || true
+  done <<EOF
+$(dev_kit_process_descendants "$root_pid")
+EOF
+
+  kill "-${signal}" "$root_pid" 2>/dev/null || true
+}
+
 dev_kit_run_guarded() {
   local label="$1"
   local soft_timeout="${2:-$DEV_KIT_PROGRESS_SOFT_TIMEOUT}"
@@ -166,7 +208,11 @@ dev_kit_run_guarded() {
     fi
 
     if [ "$hard_timeout" -gt 0 ] && [ "$elapsed" -ge "$hard_timeout" ]; then
-      kill "$pid" 2>/dev/null || true
+      dev_kit_process_signal_tree TERM "$pid"
+      sleep 2
+      if kill -0 "$pid" 2>/dev/null; then
+        dev_kit_process_signal_tree KILL "$pid"
+      fi
       wait "$pid" 2>/dev/null || true
       dev_kit_spinner_stop ""
       [ -s "$stdout_file" ] && cat "$stdout_file"

@@ -51,6 +51,28 @@ should_run() {
   return 1
 }
 
+replace_in_file() {
+  local file_path="$1"
+  local before="$2"
+  local after="$3"
+  local tmp_file=""
+
+  tmp_file="$(mktemp "${TMPDIR:-/tmp}/dev-kit-replace.XXXXXX")" || return 1
+  awk -v before="$before" -v after="$after" '
+    BEGIN { replaced = 0 }
+    {
+      line = $0
+      pos = index(line, before)
+      if (pos > 0 && replaced == 0) {
+        line = substr(line, 1, pos - 1) after substr(line, pos + length(before))
+        replaced = 1
+      }
+      print line
+    }
+    END { exit(replaced == 0) }
+  ' "$file_path" >"$tmp_file" && mv "$tmp_file" "$file_path"
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --only)
@@ -88,6 +110,14 @@ done <<EOF
 $(dev_kit_module_paths)
 EOF
 
+while IFS= read -r command_file; do
+  [ -n "$command_file" ] || continue
+  # shellcheck disable=SC1090
+  . "$command_file"
+done <<EOF
+$(find "$REPO_DIR/lib/commands" -maxdepth 1 -type f -name '*.sh' | sort)
+EOF
+
 if should_run "core"; then
   guard_soft_output="$(
     DEV_KIT_SPINNER_DISABLE=1 \
@@ -108,6 +138,24 @@ if should_run "core"; then
   [ "$guard_hard_status" -eq 124 ] || fail "guard: stops hard timeout"
   pass "guard: stops hard timeout"
   assert_contains "$guard_hard_output" "dev.kit timeout: guard test exceeded 2s" "guard: reports hard timeout"
+
+  guard_child_pid_file="$TEST_HOME/guard-child.pid"
+  set +e
+  guard_group_output="$(
+    DEV_KIT_SPINNER_DISABLE=1 \
+    dev_kit_run_guarded "guard child test" 1 2 "repo resolving is taking longer than usual" \
+      bash -lc 'sleep 30 & child=$!; printf "%s\n" "$child" > "$1"; wait "$child"' _ "$guard_child_pid_file" 2>&1
+  )"
+  guard_group_status=$?
+  set -e
+  [ "$guard_group_status" -eq 124 ] || fail "guard: stops child process groups"
+  guard_child_pid="$(cat "$guard_child_pid_file")"
+  if kill -0 "$guard_child_pid" 2>/dev/null; then
+    kill "$guard_child_pid" 2>/dev/null || true
+    fail "guard: terminates child processes on timeout"
+  fi
+  pass "guard: terminates child processes on timeout"
+  assert_contains "$guard_group_output" "dev.kit timeout: guard child test exceeded 2s" "guard: reports child timeout"
 
   cp -R "$DOCUMENTED_SHELL_REPO" "$HOME_ACTION_REPO"
   rm -rf "$HOME_ACTION_REPO/.dev-kit"
@@ -153,6 +201,20 @@ if should_run "core"; then
   assert_file_missing "$uninstall_bin_dir/dev.kit" "uninstall json: removes binary target"
   assert_file_missing "$uninstall_home_dir" "uninstall json: removes home target"
 
+  set +e
+  uninstall_failure_json="$(
+    REPO_DIR="$TEST_HOME/missing-repo" \
+    DEV_KIT_BIN_DIR="$uninstall_bin_dir" \
+    DEV_KIT_HOME="$uninstall_home_dir" \
+    dev_kit_cmd_uninstall json --yes 2>/dev/null
+  )"
+  uninstall_failure_status=$?
+  set -e
+  [ "$uninstall_failure_status" -ne 0 ] || fail "uninstall json: fails when uninstall script fails"
+  pass "uninstall json: fails when uninstall script fails"
+  assert_contains "$uninstall_failure_json" "\"ok\": false" "uninstall json: reports failure"
+  assert_contains "$uninstall_failure_json" "\"error\":" "uninstall json: includes error message"
+
   home_repeat_json="$(cd "$HOME_ACTION_REPO" && DEV_KIT_REPO_HARD_TIMEOUT=1 dev.kit --json)"
   assert_contains "$home_repeat_json" "\"context_status\": \"existing\"" "home: reuses existing context"
   assert_contains "$home_repeat_json" "\"context_reason\": null" "home: fresh context has no stale reason"
@@ -166,8 +228,10 @@ if should_run "core"; then
   assert_contains "$home_repeat_text" "reference: docs/references/config-contract-surfaces.md" "home text: shows gap reference"
   assert_contains "$home_repeat_text" "repair:            fix repo-owned gaps, then rerun dev.kit repo" "home text: prints repair loop next step"
 
-  perl -0pi -e 's/No repo-owned configuration contract was found in docs, manifests, or checked-in example files\./Add .env.example, .env.sample, or .env.template when repo configuration is required./' \
-    "$HOME_ACTION_REPO/.rabbit/context.yaml"
+  replace_in_file \
+    "$HOME_ACTION_REPO/.rabbit/context.yaml" \
+    "No repo-owned configuration contract was found in docs, manifests, or checked-in example files." \
+    "Add .env.example, .env.sample, or .env.template when repo configuration is required."
 
   stale_home_json="$(cd "$HOME_ACTION_REPO" && dev.kit --json)"
   assert_contains "$stale_home_json" "\"context_status\": \"stale\"" "home: marks outdated context as stale"
@@ -196,9 +260,26 @@ if should_run "core"; then
   assert_contains "$repo_text" "[next]" "repo text: renders next section"
   assert_contains "$repo_text" "confirm whether to start the research-and-fix loop now" "repo text: confirms before repair loop"
 
+  set +e
+  repo_write_failure_output="$(
+    DEV_KIT_SPINNER_DISABLE=1
+    dev_kit_context_yaml_write() {
+      printf 'boom\n' >&2
+      return 42
+    }
+    dev_kit_cmd_repo text "$DOCUMENTED_SHELL_REPO" 2>&1
+  )"
+  repo_write_failure_status=$?
+  set -e
+  [ "$repo_write_failure_status" -eq 42 ] || fail "repo text: preserves non-timeout write failures"
+  pass "repo text: preserves non-timeout write failures"
+  assert_contains "$repo_write_failure_output" "Context write failed with exit status 42" "repo text: distinguishes non-timeout write failures"
+  assert_contains "$repo_write_failure_output" "boom" "repo text: preserves underlying write error"
+
   self_repo_json="$(cd "$REPO_DIR" && dev.kit repo --json)"
   assert_not_contains "$self_repo_json" "\"repo\": \"udx/dev.kit\"" "repo: omits self dependency contracts"
   assert_not_contains "$(cat "$REPO_DIR/.rabbit/context.yaml")" "source_repo: udx/dev.kit" "repo: omits self source repo provenance"
+  assert_not_contains "$(cat "$REPO_DIR/.rabbit/context.yaml")" ".rabbit/dev.kit/" "repo: excludes generated rabbit evidence"
 
   cp -R "$SIMPLE_REPO" "$SIMPLE_ACTION_REPO"
   rm -rf "$SIMPLE_ACTION_REPO/.dev-kit"
