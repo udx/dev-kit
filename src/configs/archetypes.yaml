@@ -1,57 +1,19 @@
 kind: repoArchetypes
 version: udx.dev/dev.kit/v1
-description: Repo archetype definitions and matching rules
+description: Minimal repo-level archetype definitions
 
 config:
   archetypes:
-    wordpress-site:
-      description: WordPress website — application code, theme, and plugin assets deployed to a WordPress host
-      required:
-        - framework:wordpress
-      supporting:
-        - runtime:container
-        - package:node
-        - package:composer
-        - workflow:github
     workflow-repo:
-      description: GitHub Actions reusable workflow repository — shared CI/CD automation consumed by other repositories
+      description: Repo whose primary contract is reusable GitHub workflow behavior
       required:
         - workflow:github
         - repo:workflow-primary
-    package-cli:
-      description: Library or CLI tool — reusable code published as a package or standalone command-line tool
+    manifest-repo:
+      description: Repo centered on repo-owned manifests and declarative contracts
       required:
-        - package:cli
-      supporting:
-        - package:node
-        - package:composer
-        - lifecycle:build
-    docker:
-      description: Dockerized application or runtime — Dockerfile is the primary build and artifact boundary
+        - contract:manifest
+    repo-standard:
+      description: General repo standard with traceable refs, manifests, and repair surfaces
       required:
-        - runtime:container
-      supporting:
-        - lifecycle:build
-        - lifecycle:runtime
-        - lifecycle:deploy
-        - package:node
-        - package:composer
-    app:
-      description: Application bundle — source builds into an app artifact such as a Next.js bundle
-      required:
-        - framework:next
-      supporting:
-        - package:node
-        - lifecycle:build
-        - lifecycle:runtime
-        - lifecycle:deploy
-    yaml-manifests:
-      description: YAML manifest repository — declarative configs with traceable execution or backend mechanisms
-      required:
-        - manifest:yaml
-      supporting:
-        - workflow:github
-        - deploy:terraform
-        - deploy:kubernetes-manifests
-        - runtime:container
-        - package:node
+        - repo:detected

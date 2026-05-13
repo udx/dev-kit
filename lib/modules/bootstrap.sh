@@ -16,7 +16,6 @@ $REPO_DIR/lib/modules/local_env.sh
 $REPO_DIR/lib/modules/repo_signals.sh
 $REPO_DIR/lib/modules/repo_archetypes.sh
 $REPO_DIR/lib/modules/repo_factors.sh
-$REPO_DIR/lib/modules/repo_reports.sh
 $REPO_DIR/lib/modules/repo_workflows.sh
 $REPO_DIR/lib/modules/dev_sync.sh
 $REPO_DIR/lib/modules/repo_scaffold.sh
@@ -29,7 +28,7 @@ dev_kit_command_description() {
 }
 
 dev_kit_public_command_names() {
-  printf '%s\n' env repo agent uninstall
+  printf '%s\n' env repo uninstall
 }
 
 dev_kit_command_file_path() {

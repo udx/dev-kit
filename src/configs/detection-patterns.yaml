@@ -5,6 +5,7 @@ description: Regex patterns for command, workflow, and env detection
 config:
   command_patterns:
     verification: (npm test|pnpm test|yarn test|bun test|make test|bash tests/[^`[:space:]]+|\.\/tests/[^`[:space:]]+|vendor/bin/phpunit|phpunit|pytest|go test|cargo test)
+    lint: (npm run lint|pnpm lint|yarn lint|bun run lint|make lint|golangci-lint run|cargo clippy[^`]*|eslint [^`]*)
     build: (npm run build|pnpm build|yarn build|bun run build|make build|docker build[^`]*|go build|cargo build|composer build)
     run: (`[A-Za-z0-9._-]+ run[^`]*`|npm start|pnpm start|yarn start|bun run start|make run|docker compose up[^`]*|docker run[^`]*|php -S [^`]*|python -m [^`[:space:]]+|node ([./][^`[:space:]]+|[^`[:space:]]+\.js))
     env_var: ([A-Z][A-Z0-9_]{2,}=|\$\{[A-Z][A-Z0-9_]{2,}\})

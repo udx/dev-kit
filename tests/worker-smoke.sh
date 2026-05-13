@@ -143,6 +143,4 @@ docker run --rm \
     dev.kit env --json
     printf '\n== dev.kit repo --json ==\n'
     dev.kit repo --json
-    printf '\n== dev.kit agent --json ==\n'
-    dev.kit agent --json
   "

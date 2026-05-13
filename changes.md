@@ -1,5 +1,18 @@
 # Changes
 
+### unreleased
+
+### 0.10.0
+
+- Remove `dev.kit agent` so `.rabbit/context.yaml` is the single generated repo contract
+- Make `dev.kit` non-destructive at home: inspect env, summarize context status, and guide to `dev.kit repo`
+- Add generator metadata to `.rabbit/context.yaml` (`tool`, `repo`, `version`, `generated_at`)
+- Make `dev.kit repo` ensure a minimal default repo structure for empty repos: `README.md`, `.github/dependabot.yml`, `.github/workflows/`, `.rabbit/`, and `docs/`
+- Add recommended tooling repo output for `udx/worker`, `udx/reusable-workflows`, and `udx/github-rabbit-action`
+- Fix global `--json` routing so `dev.kit --json <command>` reaches the requested command instead of falling back to home output
+- Add machine-readable JSON output for `dev.kit uninstall --json --yes`
+- Ignore exported Copilot session transcripts so local session history does not leak into release diffs
+
 ### 0.9.0
 
 - Add `dev.kit env` and env config controls so repo and agent output can reflect actual tool and credential availability

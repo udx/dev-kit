@@ -1,0 +1,5 @@
+---
+kind: workerDeployConfig
+version: udx.io/worker-v1/deploy
+config:
+  image: "usabilitydynamics/udx-worker-engine:latest"

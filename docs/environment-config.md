@@ -17,13 +17,13 @@ dev.kit env
 - recommended helper tools
 - the current env config file when it exists
 
-This lets `dev.kit` describe real capability instead of pretending GitHub, cloud, or dependency resolution is available when it is not.
+This lets `dev.kit` describe real capability instead of pretending repo or dependency resolution is available when it is not.
 
 That output should shape subsequent behavior:
 
 - repo guidance should only recommend capabilities that are actually available
-- dependency and GitHub-aware tracing should be thinner when required tools or auth are unavailable
-- agent instructions should stay honest about what can be done from the current environment
+- dependency tracing should be thinner when required tools or auth are unavailable
+- repo repair guidance should stay honest about what can be done from the current environment
 
 ## `--config`
 
@@ -37,6 +37,13 @@ This creates or updates:
 
 ```text
 $DEV_KIT_HOME/config/env.yaml
+```
+
+Example:
+
+```bash
+dev.kit env --config
+dev.kit env
 ```
 
 The goal is a small, explicit control surface for disabling tools or credentials you do not want `dev.kit` to use.
@@ -66,10 +73,10 @@ Environment state affects context coverage.
 
 Examples:
 
-- if `gh` is unavailable or disabled, GitHub-aware tracing and guidance should be thinner
+- if `gh` is unavailable or disabled, dependency-repo tracing and guidance should be thinner
 - if a cloud credential is intentionally disabled, `dev.kit` should not claim that cloud path is usable
 - if only local repo signals are available, generated output should stay grounded in those signals
 
-That makes the generated contract more honest and more reusable across local agents, remote agents, and controlled worker environments.
+That makes the generated contract more honest and more reusable across local and controlled environments.
 
-In other words, `dev.kit env` is not a side utility. It is the capability layer that makes later repo and agent outputs trustworthy.
+In other words, `dev.kit env` is not a side utility. It is the capability layer that makes later repo outputs trustworthy.

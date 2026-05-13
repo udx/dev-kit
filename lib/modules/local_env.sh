@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 _DEV_KIT_ENV_NPM_ROOT=""
+_DEV_KIT_ENV_TOOL_LINES_CACHE=""
+_DEV_KIT_ENV_TOOL_PRESENCE_LINES_CACHE=""
 
 dev_kit_env_config_path() {
   printf '%s/config/env.yaml' "$DEV_KIT_HOME"
@@ -203,7 +205,52 @@ _dev_kit_env_compute_tool_lines() {
 
 # Returns tool lines. Format: tool|category|status
 dev_kit_env_tool_lines() {
-  _dev_kit_env_compute_tool_lines
+  if [ -z "$_DEV_KIT_ENV_TOOL_LINES_CACHE" ]; then
+    _DEV_KIT_ENV_TOOL_LINES_CACHE="$(_dev_kit_env_compute_tool_lines)"
+  fi
+  printf '%s\n' "$_DEV_KIT_ENV_TOOL_LINES_CACHE"
+}
+
+dev_kit_env_tool_presence_state() {
+  local tool="$1"
+
+  if dev_kit_env_tool_disabled "$tool"; then
+    printf 'disabled by config'
+    return 0
+  fi
+
+  case "$tool" in
+    "@udx/"*)
+      local npm_root=""
+      npm_root="$(dev_kit_env_npm_root)"
+      if [ -n "$npm_root" ] && [ -d "${npm_root}/${tool}" ]; then
+        printf 'available'
+      else
+        printf 'missing'
+      fi
+      return 0
+      ;;
+  esac
+
+  if command -v "$tool" >/dev/null 2>&1; then
+    printf 'available'
+  else
+    printf 'missing'
+  fi
+}
+
+_dev_kit_env_compute_tool_presence_lines() {
+  local tool=""
+  for tool in git gh npm docker yq jq aws gcloud az "@udx/worker-deployment" "@udx/mcurl"; do
+    printf '%s|%s|%s\n' "$tool" "$(dev_kit_env_tool_category "$tool")" "$(dev_kit_env_tool_presence_state "$tool")"
+  done
+}
+
+dev_kit_env_tool_presence_lines() {
+  if [ -z "$_DEV_KIT_ENV_TOOL_PRESENCE_LINES_CACHE" ]; then
+    _DEV_KIT_ENV_TOOL_PRESENCE_LINES_CACHE="$(_dev_kit_env_compute_tool_presence_lines)"
+  fi
+  printf '%s\n' "$_DEV_KIT_ENV_TOOL_PRESENCE_LINES_CACHE"
 }
 
 dev_kit_env_tools_json() {
@@ -316,7 +363,7 @@ dev_kit_env_tools_text() {
         ;;
     esac
   done <<EOF
-$(dev_kit_env_tool_lines)
+$(dev_kit_env_tool_presence_lines)
 EOF
 }
 
