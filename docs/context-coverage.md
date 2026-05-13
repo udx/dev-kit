@@ -93,7 +93,7 @@ It is not the right place for:
 
 Those should stay outside the generated repo contract.
 
-If a repo wants explicit behavior guidance for agents or reviewers, keep that in repo-owned instruction files such as `AGENTS.md` or `CLAUDE.md`, not in `context.yaml`.
+If a repo wants explicit behavior guidance for agents or reviewers, keep that in repo-owned docs or instruction files such as `AGENTS.md` or `CLAUDE.md`, not in `context.yaml`.
 
 If a gap needs reusable interpretation guidance, prefer a compact reference in `docs/references/` over embedding that explanation into generated output.
 

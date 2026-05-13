@@ -90,7 +90,7 @@ Committed repo-local context should stay useful for maintenance and automation.
 
 Agent instruction files such as `AGENTS.md` or `CLAUDE.md` are optional repo-owned policy surfaces.
 
-`dev.kit` can point maintainers toward the kind of guidance those files should contain, but it should not generate or overwrite them.
+`dev.kit` can point maintainers toward the kind of guidance those files should contain. A repo may keep that guidance in docs and, if preferred, normalize it into `AGENTS.md` as a maintained repo-owned surface.
 
 Use those files for consumer behavior rules and team-specific operating guidance. Keep `.rabbit/context.yaml` focused on generated repo facts.
 

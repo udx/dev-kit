@@ -4,6 +4,8 @@ This reference doc is for **repo-owned workflow guidance** that should stay clos
 
 Use it for compact practices, decision rules, and examples that help developers and agents work from the same contract.
 
+If a repo prefers a normalized `AGENTS.md`, this document can act as the source reference for that file after maintainer or agent confirmation.
+
 ## Default loop
 
 1. make sure the local `dev.kit` install is current
@@ -32,7 +34,7 @@ Use it for compact practices, decision rules, and examples that help developers 
 **Answer:** Fix the repo-owned source asset that should declare that contract, then rerun `dev.kit repo`.
 
 **Question:** Where should best practices live?  
-**Answer:** In repo-owned docs like this file, not in generated context output.
+**Answer:** In repo-owned docs like this file; they can also be normalized into `AGENTS.md` when the repo prefers that surface.
 
 **Question:** When should GitHub data be fetched live?  
 **Answer:** Only when the current task needs issues, PRs, reviews, workflow runs, or alerts.

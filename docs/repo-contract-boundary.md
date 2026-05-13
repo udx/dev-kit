@@ -25,6 +25,8 @@ Use **`.rabbit/context.yaml`** for generated operational summary:
 
 If a repo needs explanation, examples, or repair guidance, prefer fixing the repo-owned source asset first.
 
+That source asset may be a reference doc that later gets normalized into `AGENTS.md` if the repo prefers a dedicated instruction surface.
+
 If a repo needs a compact generated summary for tooling or safe repo-scoped execution, put it in `.rabbit/context.yaml`.
 
 ## Repair loop

@@ -81,7 +81,7 @@ That makes gaps part of the workflow, not just passive reporting.
 
 The goal is to keep the operating model current, reviewable, and repo-local.
 
-Files such as `AGENTS.md` or `CLAUDE.md` are not generated artifacts. They are repo-owned instruction surfaces that teams can maintain alongside the generated contract.
+Files such as `AGENTS.md` or `CLAUDE.md` are not generated artifacts. They are repo-owned instruction surfaces that teams can maintain alongside the generated contract, optionally normalized from repo docs such as `docs/references/agent-dev-workflow.md`.
 
 Example:
 
