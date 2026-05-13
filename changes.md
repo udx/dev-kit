@@ -14,6 +14,7 @@
 - Ignore exported Copilot session transcripts so local session history does not leak into release diffs
 - Add a repo-owned workflow reference doc for developer and agent best practices tied to `dev.kit` commands
 - Add a normalized repo-owned `AGENTS.md` for this repo, sourced from the workflow reference doc
+- Clarify docs for build-default vs runtime env contracts and workflow triggers when releases are created by automation
 
 ### 0.9.0
 
