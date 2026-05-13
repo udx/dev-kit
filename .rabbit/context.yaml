@@ -6,7 +6,7 @@ generator:
   tool: dev.kit
   repo: https://github.com/udx/dev.kit
   version: 0.10.0
-  generated_at: 2026-05-13T00:02:14Z
+  generated_at: 2026-05-13T00:55:54Z
 
 repo:
   name: dev.kit
@@ -22,6 +22,7 @@ refs:
   - ./changes.md
   - ./Makefile
   - ./docs/references/command-surfaces.md
+  - ./docs/references/repo-design.md
   - ./src/configs/archetypes.yaml
   - ./src/configs/audit-rules.yaml
   - ./src/configs/context-config.yaml
@@ -69,16 +70,14 @@ gaps:
 dependencies:
   - repo: udx/reusable-workflows
     kind: reusable workflow
-    resolved: true
-    archetype: workflow-repo
+    resolved: false
     used_by:
       - .github/workflows/context7-ops.yml
       - .github/workflows/npm-release-ops.yml
   - repo: udx/worker
     kind: manifest contract (deploy)
-    resolved: true
+    resolved: false
     declared_as: udx.io/worker-v1/deploy
-    archetype: manifest-repo
     used_by:
       - deploy.yml
 
@@ -146,22 +145,20 @@ manifests:
     declared_as: udx.io/worker-v1/deploy
     source_repo: udx/worker
     used_by:
-      - .rabbit/dev.kit/lessons-dev.kit-2026-04-14.md
-      - .rabbit/dev.kit/lessons-dev.kit-2026-04-15.md
       - Makefile
       - docs/references/command-surfaces.md
       - docs/references/config-contract-surfaces.md
+      - docs/repo-contract-boundary.md
       - lib/modules/repo_factors.sh
       - src/configs/context-config.yaml
       - src/configs/detection-signals.yaml
       - tests/suite.sh
     evidence:
       - version: udx.io/worker-v1/deploy
-      - path reference: .rabbit/dev.kit/lessons-dev.kit-2026-04-14.md
-      - path reference: .rabbit/dev.kit/lessons-dev.kit-2026-04-15.md
       - path reference: Makefile
       - path reference: docs/references/command-surfaces.md
       - path reference: docs/references/config-contract-surfaces.md
+      - path reference: docs/repo-contract-boundary.md
       - path reference: lib/modules/repo_factors.sh
       - path reference: src/configs/context-config.yaml
       - path reference: src/configs/detection-signals.yaml

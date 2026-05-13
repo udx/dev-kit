@@ -164,7 +164,11 @@ EOF
     write_status=$?
     if [ "$write_status" -ne 0 ]; then
       dev_kit_output_section "error"
-      dev_kit_output_list_item "Context write did not finish within the allowed time"
+      if [ "$write_status" -eq 124 ]; then
+        dev_kit_output_list_item "Context write did not finish within the allowed time"
+      else
+        dev_kit_output_list_item "Context write failed with exit status $write_status"
+      fi
       return "$write_status"
     fi
   fi
