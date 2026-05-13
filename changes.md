@@ -16,6 +16,7 @@
 - Add a normalized repo-owned `AGENTS.md` for this repo, sourced from the workflow reference doc
 - Clarify docs for build-default vs runtime env contracts and workflow triggers when releases are created by automation
 - Clarify that scripts and YAML manifests are the execution layer, while docs guide developer and agent decisions
+- Add integration and repo-design docs covering local/remote usage, scope, limits, and how repo contracts fit pipelines
 
 ### 0.9.0
 

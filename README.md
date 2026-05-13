@@ -180,10 +180,12 @@ All commands support `--json`.
 - [Repo Contract Boundary](docs/repo-contract-boundary.md)
 - [Environment Config](docs/environment-config.md)
 - [Context Coverage](docs/context-coverage.md)
+- [Integration](docs/integration.md)
 - [Smart Dependency Detection](docs/smart-dependency-detection.md)
 - [Reference Docs](docs/references/README.md)
 - [Reference: Command and Workflow Surfaces](docs/references/command-surfaces.md)
 - [Reference: Agent and Developer Workflow](docs/references/agent-dev-workflow.md)
+- [Reference: Repo Design](docs/references/repo-design.md)
 - [Installation](docs/installation.md)
 
 ## Testing
