@@ -77,11 +77,10 @@ for repo_path in "${repo_paths[@]}"; do
       cat "$run_out" >&2
       exit 1
     fi
+    dev.kit repo >/dev/null
     [ -f .rabbit/context.yaml ] || { printf 'missing .rabbit/context.yaml\n' >&2; exit 1; }
-    [ -f AGENTS.md ] || { printf 'missing AGENTS.md\n' >&2; exit 1; }
 
     printf 'context: %s\n' "$repo_path/.rabbit/context.yaml"
-    printf 'agents:  %s\n' "$repo_path/AGENTS.md"
     printf '\nrepo:\n'
     sed -n '1,20p' .rabbit/context.yaml
     printf '\ngaps:\n'

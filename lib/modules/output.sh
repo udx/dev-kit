@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 
 DEV_KIT_OUTPUT_LABEL_WIDTH="${DEV_KIT_OUTPUT_LABEL_WIDTH:-18}"
+DEV_KIT_PROGRESS_SOFT_TIMEOUT="${DEV_KIT_PROGRESS_SOFT_TIMEOUT:-8}"
+DEV_KIT_PROGRESS_HARD_TIMEOUT="${DEV_KIT_PROGRESS_HARD_TIMEOUT:-90}"
 
 dev_kit_output_title() {
   printf '%s\n' "$1"
@@ -69,10 +71,17 @@ dev_kit_output_first_lines() {
 # Skipped in non-interactive environments (CI, no TTY).
 
 _DEV_KIT_SPINNER_PID=""
+_DEV_KIT_SPINNER_MSG=""
+
+dev_kit_spinner_enabled() {
+  [ -t 2 ] || return 1
+  [ "${DEV_KIT_SPINNER_DISABLE:-0}" != "1" ] || return 1
+}
 
 dev_kit_spinner_start() {
   local msg="${1:-}"
-  [ -t 2 ] || return 0
+  dev_kit_spinner_enabled || return 0
+  _DEV_KIT_SPINNER_MSG="$msg"
   printf '  ⠋ %s' "$msg" >&2
   (
     set +e
@@ -94,12 +103,135 @@ dev_kit_spinner_stop() {
     wait "$_DEV_KIT_SPINNER_PID" 2>/dev/null || true
     _DEV_KIT_SPINNER_PID=""
   fi
-  [ -t 2 ] || return 0
+  _DEV_KIT_SPINNER_MSG=""
+  dev_kit_spinner_enabled || return 0
   if [ -n "$result" ]; then
     printf '\r  ✓ %-40s\n' "$result" >&2
   else
     printf '\r%-50s\r' '' >&2
   fi
+}
+
+dev_kit_spinner_notice() {
+  local message="${1:-}"
+  [ -n "$message" ] || return 0
+  if dev_kit_spinner_enabled && [ -n "${_DEV_KIT_SPINNER_PID:-}" ]; then
+    kill "$_DEV_KIT_SPINNER_PID" 2>/dev/null
+    wait "$_DEV_KIT_SPINNER_PID" 2>/dev/null || true
+    _DEV_KIT_SPINNER_PID=""
+    printf '\r  ◦ %s\n' "$message" >&2
+    return 0
+  fi
+  printf '  - %s\n' "$message" >&2
+}
+
+dev_kit_process_descendants() {
+  local root_pid="$1"
+
+  ps -eo pid=,ppid= | awk -v root="$root_pid" '
+    {
+      pid = $1
+      ppid = $2
+      children[ppid] = children[ppid] " " pid
+    }
+
+    function walk(node, list, count, idx) {
+      count = split(children[node], list, " ")
+      for (idx = 1; idx <= count; idx++) {
+        if (list[idx] == "") {
+          continue
+        }
+        walk(list[idx])
+        print list[idx]
+      }
+    }
+
+    END {
+      walk(root)
+    }
+  '
+}
+
+dev_kit_process_signal_tree() {
+  local signal="$1"
+  local root_pid="$2"
+  local child_pid=""
+
+  while IFS= read -r child_pid; do
+    [ -n "$child_pid" ] || continue
+    kill "-${signal}" "$child_pid" 2>/dev/null || true
+  done <<EOF
+$(dev_kit_process_descendants "$root_pid")
+EOF
+
+  kill "-${signal}" "$root_pid" 2>/dev/null || true
+}
+
+dev_kit_run_guarded() {
+  local label="$1"
+  local soft_timeout="${2:-$DEV_KIT_PROGRESS_SOFT_TIMEOUT}"
+  local hard_timeout="${3:-$DEV_KIT_PROGRESS_HARD_TIMEOUT}"
+  local soft_message="${4:-${label} is taking longer than usual}"
+  shift 4
+
+  local stdout_file=""
+  local stderr_file=""
+  local pid=""
+  local started_at=""
+  local now=""
+  local elapsed=0
+  local soft_announced=0
+  local status=0
+
+  stdout_file="$(mktemp "${TMPDIR:-/tmp}/dev-kit-guard-out.XXXXXX")" || return 1
+  stderr_file="$(mktemp "${TMPDIR:-/tmp}/dev-kit-guard-err.XXXXXX")" || {
+    rm -f "$stdout_file"
+    return 1
+  }
+
+  (
+    "$@"
+  ) >"$stdout_file" 2>"$stderr_file" &
+  pid=$!
+  started_at="$(date +%s)"
+
+  dev_kit_spinner_start "$label"
+
+  while kill -0 "$pid" 2>/dev/null; do
+    sleep 1
+    now="$(date +%s)"
+    elapsed=$((now - started_at))
+
+    if [ "$soft_timeout" -gt 0 ] && [ "$elapsed" -ge "$soft_timeout" ] && [ "$soft_announced" -eq 0 ]; then
+      dev_kit_spinner_notice "$soft_message"
+      soft_announced=1
+    fi
+
+    if [ "$hard_timeout" -gt 0 ] && [ "$elapsed" -ge "$hard_timeout" ]; then
+      dev_kit_process_signal_tree TERM "$pid"
+      sleep 2
+      if kill -0 "$pid" 2>/dev/null; then
+        dev_kit_process_signal_tree KILL "$pid"
+      fi
+      wait "$pid" 2>/dev/null || true
+      dev_kit_spinner_stop ""
+      [ -s "$stdout_file" ] && cat "$stdout_file"
+      [ -s "$stderr_file" ] && cat "$stderr_file" >&2
+      printf 'dev.kit timeout: %s exceeded %ss and was stopped to prevent an endless run.\n' \
+        "$label" "$hard_timeout" >&2
+      rm -f "$stdout_file" "$stderr_file"
+      return 124
+    fi
+  done
+
+  wait "$pid"
+  status=$?
+  dev_kit_spinner_stop ""
+
+  [ -s "$stdout_file" ] && cat "$stdout_file"
+  [ -s "$stderr_file" ] && cat "$stderr_file" >&2
+  rm -f "$stdout_file" "$stderr_file"
+  return "$status"
 }
 
 # ── Status-aware factor row ───────────────────────────────────────────────────

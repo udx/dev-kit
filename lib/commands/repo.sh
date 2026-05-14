@@ -2,6 +2,39 @@
 
 # @description: Analyze repo structure and factors
 
+dev_kit_repo_recommended_repos_text() {
+  cat <<'EOF'
+https://github.com/udx/worker
+https://github.com/udx/reusable-workflows
+https://github.com/udx/github-rabbit-action
+EOF
+}
+
+dev_kit_repo_recommended_repos_json() {
+  dev_kit_repo_recommended_repos_text | dev_kit_lines_to_json_array
+}
+
+dev_kit_repo_actions_json() {
+  local gap_count="${1:-0}"
+
+  if [ "$gap_count" -gt 0 ]; then
+    cat <<'EOF'
+[
+  { "id": "read-context", "type": "read", "label": "Read .rabbit/context.yaml", "path": ".rabbit/context.yaml" },
+  { "id": "confirm-research-fix-loop", "type": "user_decision", "label": "Confirm whether to start the research-and-fix loop for repo-owned gaps" },
+  { "id": "repair-loop", "type": "loop", "label": "After confirmation, research the strongest gap, repair the owning repo asset, then rerun dev.kit repo" }
+]
+EOF
+    return 0
+  fi
+
+  cat <<'EOF'
+[
+  { "id": "read-context", "type": "read", "label": "Read .rabbit/context.yaml", "path": ".rabbit/context.yaml" }
+]
+EOF
+}
+
 dev_kit_cmd_repo() {
   local format="${1:-text}"
   local repo_dir="$(pwd)"
@@ -9,9 +42,13 @@ dev_kit_cmd_repo() {
   local repo_root=""
   local repo_name=""
   local gaps_json=""
+  local actions_json=""
   local context_yaml_path=""
+  local gap_lines=""
 
   local force_resolve=0
+  local repo_soft_timeout="${DEV_KIT_REPO_SOFT_TIMEOUT:-15}"
+  local repo_hard_timeout="${DEV_KIT_REPO_HARD_TIMEOUT:-180}"
 
   # Parse flags from remaining args (skip format which is first arg)
   if [ "$#" -ge 1 ]; then
@@ -35,10 +72,14 @@ dev_kit_cmd_repo() {
   repo_dir="${repo_root:-$repo_dir}"
   repo_name="$(dev_kit_repo_name "$repo_dir")"
   context_yaml_path="$(dev_kit_context_yaml_path "$repo_dir")"
+  gaps_json="$(dev_kit_scaffold_gaps_json "$repo_dir")"
+  local gap_count
+  gap_count="$(printf '%s\n' "$gaps_json" | grep -c '"factor"' 2>/dev/null || true)"
+  gap_count="${gap_count:-0}"
+  actions_json="$(dev_kit_repo_actions_json "$gap_count")"
 
   # JSON mode: compute everything up front then emit template
   if [ "$format" = "json" ]; then
-    gaps_json="$(dev_kit_scaffold_gaps_json "$repo_dir")"
     if [ "$mode" = "write" ]; then
       dev_kit_context_yaml_write "$repo_dir" "$force_resolve" >/dev/null
     fi
@@ -51,9 +92,10 @@ dev_kit_cmd_repo() {
       "markers=$(dev_kit_repo_markers_json "$repo_dir")" \
       "factors=$(dev_kit_repo_factor_summary_json "$repo_dir")" \
       "gaps=$gaps_json" \
-      "actions=[]" \
+      "actions=$actions_json" \
       "context=$(dev_kit_json_escape "$context_yaml_path")" \
-      "dependencies=$(dev_kit_deps_json "$repo_dir")"
+      "dependencies=$(dev_kit_deps_json "$repo_dir")" \
+      "recommended_repos=$(dev_kit_repo_recommended_repos_json)"
     return 0
   fi
 
@@ -87,13 +129,19 @@ dev_kit_cmd_repo() {
   done
 
   # ── Gaps ─────────────────────────────────────────────────────────────────────
-  gaps_json="$(dev_kit_scaffold_gaps_json "$repo_dir")"
-  local gap_count
-  gap_count="$(printf '%s\n' "$gaps_json" | grep -c '"factor"' 2>/dev/null || true)"
-  gap_count="${gap_count:-0}"
   if [ "$gap_count" -gt 0 ]; then
     dev_kit_output_section "gaps"
-    dev_kit_output_list_item "${gap_count} factor(s) missing or partial"
+    gap_lines="$(printf '%s\n' "$gaps_json" | jq -r '.[] | "\(.factor) (\(.status)): \(.message // "needs stronger repo evidence")\n\((if (.repair_target // "") != "" then "  repair: " + .repair_target else empty end))\n\((if (.reference // "") != "" then "  reference: " + .reference else empty end))"' 2>/dev/null | awk 'NF' || true)"
+    if [ -n "$gap_lines" ]; then
+      while IFS= read -r gap_line; do
+        [ -n "$gap_line" ] || continue
+        dev_kit_output_list_item "$gap_line"
+      done <<EOF
+$gap_lines
+EOF
+    else
+      dev_kit_output_list_item "${gap_count} factor(s) missing or partial"
+    fi
   fi
 
   # ── Git state — branch and sync hints ────────────────────────────────────────
@@ -106,17 +154,58 @@ EOF
 
   # ── Write context.yaml ──────────────────────────────────────────────────────
   if [ "$mode" = "write" ]; then
-    dev_kit_spinner_start "writing context"
-    dev_kit_context_yaml_write "$repo_dir" "$force_resolve" >/dev/null
-    dev_kit_spinner_stop ""
+    local write_status=0
+    dev_kit_run_guarded \
+      "writing context" \
+      "$repo_soft_timeout" \
+      "$repo_hard_timeout" \
+      "repo resolving is taking longer than usual; still tracing manifests and contracts" \
+      dev_kit_context_yaml_write "$repo_dir" "$force_resolve" >/dev/null
+    write_status=$?
+    if [ "$write_status" -ne 0 ]; then
+      dev_kit_output_section "error"
+      if [ "$write_status" -eq 124 ]; then
+        dev_kit_output_list_item "Context write did not finish within the allowed time"
+      else
+        dev_kit_output_list_item "Context write failed with exit status $write_status"
+      fi
+      return "$write_status"
+    fi
+  fi
+
+  if [ -f "$context_yaml_path" ]; then
+    local dep_count manifest_count
+    dep_count="$(awk '
+      /^dependencies:/ { in_d = 1; next }
+      in_d && /^# Manifests/ { exit }
+      in_d && /^  - repo:/ { count += 1 }
+      END { print count + 0 }
+    ' "$context_yaml_path")"
+    manifest_count="$(awk '
+      /^manifests:/ { in_m = 1; next }
+      in_m && /^[^[:space:]#]/ { exit }
+      in_m && /^  - path:/ { count += 1 }
+      END { print count + 0 }
+    ' "$context_yaml_path")"
+    if [ "${dep_count:-0}" -gt 0 ] || [ "${manifest_count:-0}" -gt 0 ]; then
+      dev_kit_output_section "resolved"
+      [ "${manifest_count:-0}" -gt 0 ] && dev_kit_output_row "manifests" "$manifest_count"
+      [ "${dep_count:-0}" -gt 0 ] && dev_kit_output_row "contracts" "$dep_count"
+    fi
   fi
 
   dev_kit_output_section "context"
   dev_kit_output_list_item "$context_yaml_path"
 
+  dev_kit_output_section "tooling"
+  dev_kit_output_list_from_lines <<EOF
+$(dev_kit_repo_recommended_repos_text)
+EOF
+
   dev_kit_output_section "next"
-  dev_kit_output_row "agent" "dev.kit agent"
+  dev_kit_output_row "context" "read .rabbit/context.yaml"
   if [ "$gap_count" -gt 0 ]; then
-    dev_kit_output_row "repair" "follow AGENTS.md gap repair loop, then dev.kit repo"
+    dev_kit_output_row "decision" "confirm whether to start the research-and-fix loop now"
+    dev_kit_output_row "repair" "after confirmation, research the strongest gap, repair the owning repo asset, then rerun dev.kit repo"
   fi
 }

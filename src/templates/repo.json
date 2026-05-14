@@ -10,5 +10,6 @@
   "gaps": {{gaps}},
   "actions": {{actions}},
   "context": "{{context}}",
-  "dependencies": {{dependencies}}
+  "dependencies": {{dependencies}},
+  "recommended_repos": {{recommended_repos}}
 }

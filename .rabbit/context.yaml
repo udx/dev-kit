@@ -2,23 +2,34 @@
 # Run `dev.kit repo` to refresh.
 kind: repoContext
 version: udx.dev/dev.kit/v1
-generated: 2026-05-04
+generator:
+  tool: dev.kit
+  repo: https://github.com/udx/dev.kit
+  version: 0.10.0
+  generated_at: 2026-05-13T00:55:54Z
 
 repo:
   name: dev.kit
-  archetype: package-cli
+  archetype: manifest-repo
 
 # Refs — Direct-read files and paths that define the repo contract.
-# Note: Include only files or directories an agent should read before code exploration.
+# Note: Include only files or directories a repo consumer should read before code exploration.
 # Note: Prefer README, focused docs, workflows, manifests, and explicit operational files.
 # Note: Exclude broad implementation directories unless they are the contract themselves.
 
 refs:
   - ./README.md
   - ./changes.md
+  - ./Makefile
+  - ./docs/references/command-surfaces.md
+  - ./docs/references/repo-design.md
+  - ./src/configs/archetypes.yaml
+  - ./src/configs/audit-rules.yaml
+  - ./src/configs/context-config.yaml
+  - ./src/configs/detection-patterns.yaml
+  - ./src/configs/detection-signals.yaml
   - ./deploy.yml
   - ./.github/workflows
-  - ./Makefile
   - ./docs
 
 # Commands — Canonical repo entrypoints detected from strong repo signals.
@@ -30,6 +41,12 @@ commands:
   verify:
     run: make test
     source: Makefile
+  build:
+    run: make build
+    source: docs/references/command-surfaces.md
+  run:
+    run: make run
+    source: docs/references/command-surfaces.md
 
 # Gaps — Factors that are missing or only partially supported by current repo signals.
 # Note: Base the result on explicit factor rules, not free-form judgment.
@@ -39,55 +56,47 @@ commands:
 gaps:
   - factor: config
     status: partial
-    message: Config signals exist, but no explicit env contract file was detected. Add .env.example, .env.sample, or .env.template when runtime configuration is required.
+    message: Found config-bearing repo assets in deploy.yml, but no canonical checked-in config contract is declared yet.
+    repair_target: deploy.yml or .env.example
+    reference: docs/references/config-contract-surfaces.md
     evidence:
       - runtime config: deploy.yml
 
-# Dependencies — External repos, actions, images, or versioned manifests this repo relies on.
-# Note: Capture behavior defined outside the current checkout.
+# Dependencies — Meaningful dependency-repo contracts such as reusable workflows, images, or versioned manifests this repo relies on.
+# Note: Capture execution-shaping behavior defined outside the current checkout.
+# Note: Avoid promoting standard package inventory or ordinary GitHub action refs into top-level context.
 # Note: Normalize same-org versioned refs into repo slugs when possible.
-# Note: Keep where-used tracing so the dependency can be followed back to its source.
 
 dependencies:
   - repo: udx/reusable-workflows
     kind: reusable workflow
-    resolved: true
-    archetype: workflow-repo
-    description: Reusable GitHub Actions workflow templates for CI/CD
+    resolved: false
     used_by:
       - .github/workflows/context7-ops.yml
       - .github/workflows/npm-release-ops.yml
-  - repo: udx/dev.kit
-    kind: manifest contract (v1)
-    resolved: true
-    declared_as: udx.dev/dev.kit/v1
-    archetype: package-cli
-    used_by:
-      - src/configs/archetypes.yaml
-      - src/configs/audit-rules.yaml
-      - src/configs/context-config.yaml
-      - src/configs/detection-patterns.yaml
-      - src/configs/detection-signals.yaml
   - repo: udx/worker
     kind: manifest contract (deploy)
-    resolved: true
+    resolved: false
     declared_as: udx.io/worker-v1/deploy
-    archetype: runtime-image
-    description: UDX Worker Docker image
     used_by:
       - deploy.yml
 
-# Manifests — YAML files that define detection rules, workflows, evaluation, deploy, or runtime behavior.
-# Note: Include manifests that materially shape repo behavior or agent understanding.
+# Manifests — YAML files that define repo-specific workflow, deploy, or contract behavior.
+# Note: Include custom config/manifests that materially shape repo behavior or contract understanding.
+# Note: Do not include workflow YAML only because it lives under .github/workflows.
+# Note: Promote workflow files only when they declare reusable workflow refs or other repo-specific execution contracts.
 # Note: Prefer structured kind and description metadata from the manifest itself.
-# Note: Include eval and workflow manifests, not only deploy manifests.
+# Note: Include hidden or nested contract dirs when they contain repo-owned manifests with meaningful metadata.
 
 manifests:
+  - path: .github/workflows/context7-ops.yml
+    kind: githubWorkflow
+  - path: .github/workflows/npm-release-ops.yml
+    kind: githubWorkflow
   - path: src/configs/archetypes.yaml
     kind: repoArchetypes
-    description: Repo archetype definitions and matching rules
+    description: Minimal repo-level archetype definitions
     declared_as: udx.dev/dev.kit/v1
-    source_repo: udx/dev.kit
     used_by:
       - lib/modules/config_catalog.sh
     evidence:
@@ -97,7 +106,6 @@ manifests:
     kind: auditRules
     description: Gap messages and guidance for missing or partial repo factors
     declared_as: udx.dev/dev.kit/v1
-    source_repo: udx/dev.kit
     used_by:
       - lib/modules/config_catalog.sh
     evidence:
@@ -105,9 +113,8 @@ manifests:
       - path reference: lib/modules/config_catalog.sh
   - path: src/configs/context-config.yaml
     kind: contextConfig
-    description: Repo root markers, direct-read refs, and documentation priority order
+    description: Minimal repo root markers, direct-read refs, and documentation priority order
     declared_as: udx.dev/dev.kit/v1
-    source_repo: udx/dev.kit
     used_by:
       - lib/modules/config_catalog.sh
     evidence:
@@ -117,7 +124,6 @@ manifests:
     kind: detectionPatterns
     description: Regex patterns for command, workflow, and env detection
     declared_as: udx.dev/dev.kit/v1
-    source_repo: udx/dev.kit
     used_by:
       - lib/modules/repo_signals.sh
     evidence:
@@ -127,51 +133,34 @@ manifests:
     kind: detectionSignals
     description: File, directory, and glob signals for factor and dependency detection
     declared_as: udx.dev/dev.kit/v1
-    source_repo: udx/dev.kit
     used_by:
-      - tests/suite.sh
       - lib/modules/repo_signals.sh
+      - tests/suite.sh
     evidence:
       - version: udx.dev/dev.kit/v1
-      - path reference: tests/suite.sh
       - path reference: lib/modules/repo_signals.sh
-  - path: .github/workflows/context7-ops.yml
-    kind: githubWorkflow
-  - path: .github/workflows/npm-release-ops.yml
-    kind: githubWorkflow
-    used_by:
-      - .claude/settings.local.json
-    evidence:
-      - path reference: .claude/settings.local.json
+      - path reference: tests/suite.sh
   - path: deploy.yml
     kind: workerDeployConfig
     declared_as: udx.io/worker-v1/deploy
     source_repo: udx/worker
     used_by:
       - Makefile
-      - tests/suite.sh
-      - tests/fixtures/docker-repo/.dev-kit/manifest.json
-      - tests/fixtures/docker-repo/.rabbit/context.yaml
-      - .claude/settings.local.json
-      - lib/modules/repo_scaffold.sh
-      - src/configs/detection-signals.yaml
+      - docs/references/command-surfaces.md
+      - docs/references/config-contract-surfaces.md
+      - docs/repo-contract-boundary.md
+      - lib/modules/repo_factors.sh
       - src/configs/context-config.yaml
+      - src/configs/detection-signals.yaml
+      - tests/suite.sh
     evidence:
       - version: udx.io/worker-v1/deploy
       - path reference: Makefile
-      - path reference: tests/suite.sh
-      - path reference: tests/fixtures/docker-repo/.dev-kit/manifest.json
-      - path reference: tests/fixtures/docker-repo/.rabbit/context.yaml
-      - path reference: .claude/settings.local.json
-      - path reference: lib/modules/repo_scaffold.sh
-      - path reference: src/configs/detection-signals.yaml
+      - path reference: docs/references/command-surfaces.md
+      - path reference: docs/references/config-contract-surfaces.md
+      - path reference: docs/repo-contract-boundary.md
+      - path reference: lib/modules/repo_factors.sh
       - path reference: src/configs/context-config.yaml
-  - path: evals/promptfooconfig.yaml
-    description: "dev.kit context impact — with vs without AGENTS.md"
-    used_by:
-      - Makefile
-      - src/configs/detection-signals.yaml
-    evidence:
-      - path reference: Makefile
       - path reference: src/configs/detection-signals.yaml
+      - path reference: tests/suite.sh
 

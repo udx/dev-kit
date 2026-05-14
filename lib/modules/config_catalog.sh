@@ -141,19 +141,50 @@ dev_kit_repo_priority_refs() {
   local repo_dir="${1:-$(pwd)}"
   local list_name=""
   local refs=""
+  local base_refs=""
+  local ref=""
+  local source=""
+  local result=""
 
   while IFS= read -r list_name; do
     [ -n "$list_name" ] || continue
-    refs="${refs}$(dev_kit_repo_priority_list "$repo_dir" "$list_name")
-"
+    base_refs="${base_refs}$(dev_kit_repo_priority_list "$repo_dir" "$list_name")
+    "
   done <<EOF
 $(dev_kit_context_section_list "refs" "source_lists")
 EOF
 
-  if [ -z "$refs" ]; then
+  if [ -z "$base_refs" ]; then
     dev_kit_repo_priority_list "$repo_dir" "priority_paths"
     return 0
   fi
+
+  while IFS= read -r ref; do
+    [ -n "$ref" ] || continue
+    case "$ref" in
+      ./README*|./readme*|./changes.md|./CHANGELOG.md)
+        refs="${refs}${ref}
+"
+        ;;
+    esac
+  done <<EOF
+$base_refs
+EOF
+
+  for source in verification build_release_run runtime; do
+    result="$(dev_kit_repo_command_detection_result "$repo_dir" "$source" 2>/dev/null || true)"
+    [ -n "$result" ] || continue
+    ref="$(printf '%s' "$result" | cut -d'|' -f3)"
+    [ -n "$ref" ] || continue
+    refs="${refs}./${ref}
+"
+  done
+
+  refs="${refs}$(dev_kit_repo_contract_doc_refs "$repo_dir")
+"
+  refs="${refs}$(dev_kit_repo_contract_manifest_refs "$repo_dir")
+"
+  refs="${refs}${base_refs}"
 
   printf "%s" "$refs" | dev_kit_unique_lines_ci
 }

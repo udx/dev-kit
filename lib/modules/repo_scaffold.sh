@@ -4,6 +4,39 @@
 # Analysis (what's missing) stays in repo_factors.sh and repo_signals.sh.
 # This module only handles creating or updating files and dirs.
 
+dev_kit_repo_write_if_missing() {
+  local target_path="$1"
+  local file_body="$2"
+
+  [ -e "$target_path" ] && return 0
+  printf '%s' "$file_body" > "$target_path"
+}
+
+dev_kit_repo_ensure_default_structure() {
+  local repo_root="$1"
+  local repo_name=""
+
+  repo_name="$(dev_kit_repo_name "$repo_root")"
+
+  mkdir -p "${repo_root}/.github/workflows" "${repo_root}/.rabbit" "${repo_root}/docs"
+
+  dev_kit_repo_write_if_missing "${repo_root}/README.md" "# ${repo_name}
+
+This repository uses \`dev.kit\` for repo-driven context coverage.
+
+- Run \`dev.kit\` to inspect environment and repo context status
+- Run \`dev.kit repo\` to regenerate \`.rabbit/context.yaml\`
+"
+
+  dev_kit_repo_write_if_missing "${repo_root}/.github/dependabot.yml" "version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: \"/\"
+    schedule:
+      interval: weekly
+"
+}
+
 # Manifest metadata must live in the manifest itself, not in shell code.
 dev_kit_manifest_metadata() {
   local manifest_path="$1"
@@ -90,6 +123,8 @@ dev_kit_manifest_backend_yaml() {
   done <<EOF
 $(dev_kit_manifest_module_values "$manifest_path")
 EOF
+
+  return 0
 }
 
 dev_kit_github_repo_refs_in_file() {
@@ -140,6 +175,37 @@ dev_kit_manifest_comment_repo_refs() {
   dev_kit_github_repo_refs_in_file "$manifest_path"
 }
 
+dev_kit_repo_is_contract_evidence_path() {
+  local path="$1"
+
+  case "$path" in
+    ""|.git/*|.rabbit/context.yaml|.rabbit/dev.kit/*|AGENTS.md|.udx/*|.claude/*|.copilot/*|.cursor/*)
+      return 1
+      ;;
+  esac
+
+  return 0
+}
+
+dev_kit_repo_current_slug() {
+  local repo_root="$1"
+  local repo_name="$2"
+  local repo_slug=""
+  local repo_org=""
+
+  repo_slug="$(dev_kit_repo_slug_from_remote "$repo_root" 2>/dev/null || true)"
+  if [ -n "$repo_slug" ]; then
+    printf '%s' "$repo_slug"
+    return 0
+  fi
+
+  repo_org="$(dev_kit_repo_org_from_remote "$repo_root" 2>/dev/null || true)"
+  if [ -n "$repo_org" ] && [ -n "$repo_name" ]; then
+    printf '%s/%s' "$repo_org" "$repo_name"
+    return 0
+  fi
+}
+
 dev_kit_manifest_usage_paths() {
   local repo_root="$1"
   local manifest_rel="$2"
@@ -148,19 +214,97 @@ dev_kit_manifest_usage_paths() {
 
   [ -n "$manifest_rel" ] || return 0
 
+  if dev_kit_sync_has_git_repo "$repo_root"; then
+    (
+      cd "$repo_root" &&
+      git grep -F -l --untracked -- "$manifest_rel" -- . 2>/dev/null || true
+    ) | while IFS= read -r scan_rel; do
+      [ -n "$scan_rel" ] || continue
+      [ "$scan_rel" = "$manifest_rel" ] && continue
+      dev_kit_repo_is_contract_evidence_path "$scan_rel" || continue
+      printf '%s\n' "$scan_rel"
+    done
+    return 0
+  fi
+
   while IFS= read -r scan_file; do
     [ -f "$scan_file" ] || continue
     scan_rel="${scan_file#"${repo_root}/"}"
 
-    case "$scan_rel" in
-      "$manifest_rel"|.git/*|.rabbit/*|AGENTS.md) continue ;;
-    esac
+    [ "$scan_rel" = "$manifest_rel" ] && continue
+    dev_kit_repo_is_contract_evidence_path "$scan_rel" || continue
 
     if grep -Fq -- "$manifest_rel" "$scan_file" 2>/dev/null; then
       printf '%s\n' "$scan_rel"
     fi
   done <<EOF
-$(dev_kit_repo_find "$repo_root" -type f 2>/dev/null)
+$(dev_kit_repo_content_files "$repo_root")
+EOF
+}
+
+dev_kit_repo_reusable_workflow_contract_files() {
+  local repo_root="$1"
+  local workflow_dir=""
+  local workflow_file=""
+
+  while IFS= read -r workflow_dir; do
+    [ -n "$workflow_dir" ] && [ -d "${repo_root}/${workflow_dir}" ] || continue
+    while IFS= read -r workflow_file; do
+      [ -f "$workflow_file" ] || continue
+      if grep -qE 'uses:[[:space:]]*["'"'"']?[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/\.github/workflows/[^@[:space:]]+@' "$workflow_file" 2>/dev/null; then
+        printf '%s\n' "${workflow_file#"${repo_root}/"}"
+      fi
+    done <<EOF
+$(find "${repo_root}/${workflow_dir}" -maxdepth 1 \( -name '*.yaml' -o -name '*.yml' \) 2>/dev/null | sort)
+EOF
+  done <<EOF
+$(dev_kit_detection_list "workflow_globs" | sed 's#/[^/]*$##' | awk '!seen[$0]++')
+EOF
+}
+
+dev_kit_repo_contract_manifest_files() {
+  local repo_root="$1"
+  local manifest_dir=""
+  local manifest_rel=""
+
+  while IFS= read -r manifest_dir; do
+    [ -n "$manifest_dir" ] && [ -d "${repo_root}/${manifest_dir}" ] || continue
+    while IFS= read -r manifest_rel; do
+      [ -n "$manifest_rel" ] || continue
+      case "$manifest_rel" in
+        */context.yaml) continue ;;
+      esac
+      printf '%s\n' "${manifest_rel#"${repo_root}/"}"
+    done <<EOF
+$(find "${repo_root}/${manifest_dir}" -type f \( -name '*.yaml' -o -name '*.yml' \) 2>/dev/null | sort)
+EOF
+  done <<EOF
+$(dev_kit_context_section_detection_list_values "dependencies" "versioned_dirs")
+EOF
+
+  while IFS= read -r manifest_dir; do
+    [ -n "$manifest_dir" ] && [ -d "${repo_root}/${manifest_dir}" ] || continue
+    while IFS= read -r manifest_rel; do
+      [ -n "$manifest_rel" ] || continue
+      case "$manifest_rel" in
+        */context.yaml) continue ;;
+      esac
+      printf '%s\n' "${manifest_rel#"${repo_root}/"}"
+    done <<EOF
+$(find "${repo_root}/${manifest_dir}" -maxdepth 1 \( -name '*.yaml' -o -name '*.yml' \) 2>/dev/null | sort)
+EOF
+  done <<EOF
+$(dev_kit_context_section_detection_list_values "manifests" "config_dirs")
+EOF
+
+  while IFS= read -r manifest_rel; do
+    [ -n "$manifest_rel" ] && [ -f "${repo_root}/${manifest_rel}" ] || continue
+    case "$manifest_rel" in
+      */context.yaml) continue ;;
+    esac
+    printf '%s\n' "$manifest_rel"
+  done <<EOF
+$(dev_kit_context_section_detection_list_values "manifests" "root_files")
 EOF
 }
 
@@ -192,6 +336,8 @@ dev_kit_manifest_provenance_yaml() {
   local repo_root="$1"
   local manifest_rel="$2"
   local manifest_path="${repo_root}/${manifest_rel}"
+  local repo_name=""
+  local current_repo_slug=""
   local declared_as=""
   local source_repo=""
   local evidence_yaml=""
@@ -200,8 +346,11 @@ dev_kit_manifest_provenance_yaml() {
   local usage_path=""
   local comment_repo=""
 
+  repo_name="$(dev_kit_repo_name "$repo_root")"
+  current_repo_slug="$(dev_kit_repo_current_slug "$repo_root" "$repo_name" 2>/dev/null || true)"
   declared_as="$(dev_kit_manifest_version_value "$manifest_path")"
   source_repo="$(dev_kit_manifest_source_repo "$manifest_path")"
+  [ -n "$current_repo_slug" ] && [ "$source_repo" = "$current_repo_slug" ] && source_repo=""
   usage_paths="$(dev_kit_manifest_usage_paths "$repo_root" "$manifest_rel" | awk '!seen[$0]++')"
 
   [ -n "$declared_as" ] && printf '    declared_as: %s\n' "$declared_as"
@@ -260,10 +409,15 @@ dev_kit_manifest_yaml_item() {
   [ -n "$manifest_description" ] && printf '    description: %s\n' "$manifest_description"
   dev_kit_manifest_provenance_yaml "$repo_root" "$manifest_rel"
   dev_kit_manifest_backend_yaml "$repo_root" "$manifest_rel"
+  return 0
 }
 
 dev_kit_version_uri() {
   printf '%s' 'udx.dev/dev.kit/v1'
+}
+
+dev_kit_tool_version() {
+  awk -F'"' '/"version"/{print $4; exit}' "$REPO_DIR/package.json" 2>/dev/null
 }
 
 dev_kit_context_section_comment_block() {
@@ -352,14 +506,18 @@ dev_kit_scaffold_gaps_json() {
     [ -n "$factor" ] || continue
     status="$(dev_kit_repo_factor_status "$repo_root" "$factor")"
     [ "$status" = "missing" ] || [ "$status" = "partial" ] || continue
-    local rule_id message
-    rule_id="$(dev_kit_repo_factor_rule_id "$factor" "$status" 2>/dev/null || true)"
-    message="$([ -n "$rule_id" ] && dev_kit_rule_message "$rule_id" || printf '%s is %s' "$factor" "$status")"
+    local message repair_target reference
+    message="$(dev_kit_repo_factor_message "$repo_root" "$factor" "$status" 2>/dev/null || true)"
+    repair_target="$(dev_kit_repo_factor_repair_target "$repo_root" "$factor" "$status" 2>/dev/null || true)"
+    reference="$(dev_kit_repo_factor_reference "$repo_root" "$factor" "$status" 2>/dev/null || true)"
     [ "$first" -eq 0 ] && printf ',\n'
-    printf '  { "factor": "%s", "status": "%s", "message": "%s" }' \
+    printf '  { "factor": "%s", "status": "%s", "message": "%s"' \
       "$factor" \
       "$status" \
       "$(dev_kit_json_escape "$message")"
+    [ -n "$repair_target" ] && printf ', "repair_target": "%s"' "$(dev_kit_json_escape "$repair_target")"
+    [ -n "$reference" ] && printf ', "reference": "%s"' "$(dev_kit_json_escape "$reference")"
+    printf ' }'
     first=0
   done <<EOF
 $(dev_kit_context_factor_ids)
@@ -378,6 +536,24 @@ dev_kit_repo_org_from_remote() {
   if [[ "$url" =~ github\.com[:/]([^/]+)/ ]]; then
     printf '%s' "${BASH_REMATCH[1]}"
   fi
+}
+
+dev_kit_repo_slug_from_remote() {
+  local repo_root="$1"
+  local url=""
+  local slug=""
+
+  url="$(git -C "$repo_root" remote get-url origin 2>/dev/null || true)"
+  [ -n "$url" ] || return 0
+
+  slug="$url"
+  case "$slug" in
+    *github.com:*) slug="${slug#*github.com:}" ;;
+    *github.com/*) slug="${slug#*github.com/}" ;;
+    *) return 0 ;;
+  esac
+  slug="${slug%.git}"
+  printf '%s' "$slug"
 }
 
 # Check if a dependency identifier belongs to the same GitHub org.
@@ -474,7 +650,7 @@ dev_kit_dep_resolve() {
 }
 
 # Read structured dependencies from context.yaml and emit JSON array.
-# Used by repo.json and agent.json template rendering.
+# Used by repo.json template rendering.
 dev_kit_deps_json() {
   local repo_dir="$1"
   local context_yaml="${repo_dir}/.rabbit/context.yaml"
@@ -523,7 +699,7 @@ dev_kit_context_yaml_write() {
   local repo_root="$1"
   local force="${2:-0}"
   local context_path="${repo_root}/.rabbit/context.yaml"
-  mkdir -p "${repo_root}/.rabbit" 2>/dev/null || true
+  dev_kit_repo_ensure_default_structure "$repo_root"
 
   local _repo _arch _arch_desc
   _repo="$(dev_kit_repo_name "$repo_root")"
@@ -535,7 +711,11 @@ dev_kit_context_yaml_write() {
     printf '# Run `dev.kit repo` to refresh.\n'
     printf 'kind: repoContext\n'
     printf 'version: %s\n' "$(dev_kit_version_uri)"
-    printf 'generated: %s\n\n' "$(date +%Y-%m-%d)"
+    printf 'generator:\n'
+    printf '  tool: dev.kit\n'
+    printf '  repo: https://github.com/udx/dev.kit\n'
+    printf '  version: %s\n' "$(dev_kit_tool_version)"
+    printf '  generated_at: %s\n\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
     printf 'repo:\n'
     printf '  name: %s\n'      "$_repo"
@@ -604,6 +784,8 @@ EOF
         "  - factor: " + .key,
         "    status: " + .value.status,
         (if (.value.message // "") != "" then "    message: " + .value.message else empty end),
+        (if (.value.repair_target // "") != "" then "    repair_target: " + .value.repair_target else empty end),
+        (if (.value.reference // "") != "" then "    reference: " + .value.reference else empty end),
         (if ((.value.evidence // []) | length) > 0 then "    evidence:" else empty end),
         ((.value.evidence // [])[]? | "      - " + .)
       ] | .[]
@@ -615,17 +797,19 @@ EOF
     fi
 
     local _current_org=""
+    local _current_repo_slug=""
     if dev_kit_sync_has_git_repo "$repo_root"; then
       _current_org="$(dev_kit_repo_org_from_remote "$repo_root")"
     fi
+    _current_repo_slug="$(dev_kit_repo_current_slug "$repo_root" "$_repo" 2>/dev/null || true)"
     local _gh_auth_state=""
     _gh_auth_state="$(dev_kit_sync_gh_auth_state 2>/dev/null || printf 'missing')"
 
     local _dep_triples_file
     _dep_triples_file="$(mktemp)" || return 1
 
-    # Source 1: Workflow references — uses: org/repo/...@ref and uses: docker://...
-    # Catches reusable workflows, direct actions, and Docker actions.
+    # Source 1: Workflow references — keep only execution-shaping external
+    # contracts such as reusable workflows and docker:// actions.
     # Also scans image: fields in workflow files for container job images.
     local _dep_dir
     while IFS= read -r _dep_dir; do
@@ -653,16 +837,7 @@ EOF
             _dep_img="$(printf '%s' "$_content" | awk '{sub(/.*uses:[[:space:]]*[Dd]ocker:\/\//, ""); gsub(/["'"'"']/, ""); sub(/@.*/, ""); print}')"
             [ -n "$_dep_img" ] && printf '%s|docker action|%s\n' "$_dep_img" "$_src_rel" >> "$_dep_triples_file"
             ;;
-          *uses:*/*/*@*|*uses:*./*) ;;  # skip local refs and deeply-pathed refs already caught
-          *uses:*/*@*)
-            # Direct action: uses: org/repo@ref (not a reusable workflow, not actions/*)
-            local _dep_repo
-            _dep_repo="$(printf '%s' "$_content" | awk '{
-              sub(/.*uses:[[:space:]]*/, ""); gsub(/"/, ""); sub(/@.*/, "")
-              if ($0 !~ /^\./ && $0 ~ /\//) print
-            }')"
-            [ -n "$_dep_repo" ] && printf '%s|github action|%s\n' "$_dep_repo" "$_src_rel" >> "$_dep_triples_file"
-            ;;
+          *uses:*/*/*@*|*uses:*./*|*uses:*/*@*) ;;
         esac
       done <<EOF
 $(grep -r 'uses:' "${repo_root}/${_dep_dir}/" 2>/dev/null || true)
@@ -759,9 +934,7 @@ EOF
 $(find "${repo_root}/${_manifest_dir}" -maxdepth 1 \( -name '*.yaml' -o -name '*.yml' \) 2>/dev/null | sort)
 EOF
     done <<EOF
-$(printf '%s\n%s\n' \
-  "$(dev_kit_context_section_detection_list_values "manifests" "config_dirs")" \
-  "$(dev_kit_context_section_detection_list_values "manifests" "workflow_dirs")" | awk '!seen[$0]++')
+$(dev_kit_context_section_detection_list_values "manifests" "config_dirs")
 EOF
 
     while IFS= read -r _vf_rel; do
@@ -781,63 +954,6 @@ EOF
 $(dev_kit_context_section_detection_list_values "manifests" "root_files")
 EOF
 
-    # Source 5: GitHub URLs — github.com/org/repo in repo docs and manifest files
-    local _url_glob
-    while IFS= read -r _url_glob; do
-      [ -n "$_url_glob" ] || continue
-      while IFS= read -r _uf; do
-        [ -f "$_uf" ] || continue
-        local _uf_rel="${_uf#"${repo_root}/"}"
-        while IFS= read -r _repo_ref; do
-          [ -n "$_repo_ref" ] || continue
-          [ "$_repo_ref" = "$_repo" ] && continue
-          case "$_repo_ref" in
-            *.md|*.yml|*.yaml|*.json|*.sh|*.txt) continue ;;
-          esac
-          printf '%s|github reference|%s\n' "$_repo_ref" "$_uf_rel" >> "$_dep_triples_file"
-        done <<EOF
-$(dev_kit_github_repo_refs_in_file "$_uf")
-EOF
-      done <<EOF
-$(find "$repo_root" -maxdepth 1 -name "$_url_glob" -not -name 'AGENTS.md' 2>/dev/null)
-EOF
-    done <<EOF
-$(dev_kit_context_section_detection_list_values "dependencies" "url_globs")
-EOF
-
-    local _url_dir
-    while IFS= read -r _url_dir; do
-      [ -n "$_url_dir" ] && [ -d "${repo_root}/${_url_dir}" ] || continue
-      while IFS= read -r _uf; do
-        [ -f "$_uf" ] || continue
-        local _uf_rel="${_uf#"${repo_root}/"}"
-        while IFS= read -r _repo_ref; do
-          [ -n "$_repo_ref" ] || continue
-          [ "$_repo_ref" = "$_repo" ] && continue
-          case "$_repo_ref" in
-            *.md|*.yml|*.yaml|*.json|*.sh|*.txt) continue ;;
-          esac
-          printf '%s|github reference|%s\n' "$_repo_ref" "$_uf_rel" >> "$_dep_triples_file"
-        done <<EOF
-$(dev_kit_github_repo_refs_in_file "$_uf")
-EOF
-      done <<EOF
-$(find "${repo_root}/${_url_dir}" -type f \( -name '*.yaml' -o -name '*.yml' -o -name '*.md' \) 2>/dev/null)
-EOF
-    done <<EOF
-$(printf '%s\n%s\n' \
-  "$(dev_kit_context_section_detection_list_values "manifests" "config_dirs")" \
-  "$(dev_kit_context_section_detection_list_values "manifests" "workflow_dirs")" | awk '!seen[$0]++')
-EOF
-
-    # Source 6: npm packages from package.json
-    if [ -f "${repo_root}/package.json" ]; then
-      jq -r '
-        (.dependencies // {}) + (.devDependencies // {}) |
-        to_entries[] | "\(.key)|npm package|package.json"
-      ' "${repo_root}/package.json" 2>/dev/null >> "$_dep_triples_file" || true
-    fi
-
     # Normalize dependency identifiers so multiple evidence types can collapse
     # into a single repo-level dependency entry.
     local _dep_norm_file
@@ -856,6 +972,15 @@ EOF
           [ -n "$_dep_key" ] || _dep_key="$_dep_id"
           ;;
       esac
+
+      # Keep repo-owned manifests in the manifests section, but do not emit
+      # them as external dependency contracts pointing back to the current repo.
+      if [ -n "$_current_repo_slug" ] && [ "$_dep_key" = "$_current_repo_slug" ]; then
+        continue
+      fi
+      if [ -n "$_current_org" ] && [ "$_dep_key" = "${_current_org}/${_repo}" ]; then
+        continue
+      fi
 
       printf '%s|%s|%s|%s\n' "$_dep_key" "$_dep_kind" "$_dep_src" "$_dep_declared_as" >> "$_dep_norm_file"
     done < "$_dep_triples_file"
@@ -928,38 +1053,18 @@ EOF
     rm -f "$_dep_norm_file"
 
     local _manifests_yaml=""
-    local _yaml_file _yaml_rel _yaml_kind _yaml_desc _manifest_meta _manifest_dir
-    while IFS= read -r _manifest_dir; do
-      [ -n "$_manifest_dir" ] && [ -d "${repo_root}/${_manifest_dir}" ] || continue
-      while IFS= read -r _yaml_file; do
-        [ -n "$_yaml_file" ] && [ -f "$_yaml_file" ] || continue
-        _yaml_rel="${_yaml_file#"${repo_root}/"}"
-        _manifests_yaml="${_manifests_yaml}$(dev_kit_manifest_yaml_item "$repo_root" "$_yaml_rel")\n"
-      done <<EOF
-$(find "${repo_root}/${_manifest_dir}" -maxdepth 1 \( -name '*.yaml' -o -name '*.yml' \) -print 2>/dev/null | sort)
-EOF
-    done <<EOF
-$(dev_kit_context_section_detection_list_values "manifests" "config_dirs")
-EOF
-    # Workflow dirs from config (e.g. .github/workflows)
-    while IFS= read -r _dep_dir; do
-      [ -n "$_dep_dir" ] && [ -d "${repo_root}/${_dep_dir}" ] || continue
-      while IFS= read -r _yaml_file; do
-        [ -n "$_yaml_file" ] && [ -f "$_yaml_file" ] || continue
-        _yaml_rel="${_yaml_file#"${repo_root}/"}"
-        _manifests_yaml="${_manifests_yaml}$(dev_kit_manifest_yaml_item "$repo_root" "$_yaml_rel" "githubWorkflow")\n"
-      done <<EOF
-$(find "${repo_root}/${_dep_dir}" -maxdepth 1 \( -name '*.yaml' -o -name '*.yml' \) 2>/dev/null | sort)
-EOF
-    done <<EOF
-$(dev_kit_context_section_detection_list_values "manifests" "workflow_dirs")
-EOF
-    # Standalone manifest files from config (deploy.yml, docker-compose.yml, etc.)
+    local _yaml_rel _yaml_kind _yaml_desc _manifest_meta _manifest_dir
     while IFS= read -r _yaml_rel; do
-      [ -n "$_yaml_rel" ] && [ -f "${repo_root}/${_yaml_rel}" ] || continue
+      [ -n "$_yaml_rel" ] || continue
+      _manifests_yaml="${_manifests_yaml}$(dev_kit_manifest_yaml_item "$repo_root" "$_yaml_rel" "githubWorkflow")\n"
+    done <<EOF
+$(dev_kit_repo_reusable_workflow_contract_files "$repo_root")
+EOF
+    while IFS= read -r _yaml_rel; do
+      [ -n "$_yaml_rel" ] || continue
       _manifests_yaml="${_manifests_yaml}$(dev_kit_manifest_yaml_item "$repo_root" "$_yaml_rel")\n"
     done <<EOF
-$(dev_kit_context_section_detection_list_values "manifests" "root_files")
+$(dev_kit_repo_contract_manifest_files "$repo_root")
 EOF
     if [ -n "$_manifests_yaml" ]; then
       dev_kit_context_section_comment_block "manifests"

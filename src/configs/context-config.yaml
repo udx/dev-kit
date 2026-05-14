@@ -1,6 +1,6 @@
 kind: contextConfig
 version: udx.dev/dev.kit/v1
-description: Repo root markers, direct-read refs, and documentation priority order
+description: Minimal repo root markers, direct-read refs, and documentation priority order
 
 config:
   context_sections:
@@ -8,7 +8,7 @@ config:
       title: Refs
       summary: Direct-read files and paths that define the repo contract.
       notes:
-        - Include only files or directories an agent should read before code exploration.
+        - Include only files or directories a repo consumer should read before code exploration.
         - Prefer README, focused docs, workflows, manifests, and explicit operational files.
         - Exclude broad implementation directories unless they are the contract themselves.
       source_lists:
@@ -42,11 +42,11 @@ config:
         - pipeline
     dependencies:
       title: Dependencies
-      summary: External repos, actions, images, or versioned manifests this repo relies on.
+      summary: Meaningful dependency-repo contracts such as reusable workflows, images, or versioned manifests this repo relies on.
       notes:
-        - Capture behavior defined outside the current checkout.
+        - Capture execution-shaping behavior defined outside the current checkout.
+        - Avoid promoting standard package inventory or ordinary GitHub action refs into top-level context.
         - Normalize same-org versioned refs into repo slugs when possible.
-        - Keep where-used tracing so the dependency can be followed back to its source.
       workflow_dirs:
         - dependency_trace_workflow_dirs
       container_files:
@@ -55,17 +55,15 @@ config:
         - dependency_trace_compose_files
       versioned_dirs:
         - dependency_trace_versioned_dirs
-      url_globs:
-        - dependency_trace_url_globs
     manifests:
       title: Manifests
-      summary: YAML files that define detection rules, workflows, evaluation, deploy, or runtime behavior.
+      summary: YAML files that define repo-specific workflow, deploy, or contract behavior.
       notes:
-        - Include manifests that materially shape repo behavior or agent understanding.
+        - Include custom config/manifests that materially shape repo behavior or contract understanding.
+        - Do not include workflow YAML only because it lives under .github/workflows.
+        - Promote workflow files only when they declare reusable workflow refs or other repo-specific execution contracts.
         - Prefer structured kind and description metadata from the manifest itself.
-        - Include eval and workflow manifests, not only deploy manifests.
-      workflow_dirs:
-        - manifest_workflow_dirs
+        - Include hidden or nested contract dirs when they contain repo-owned manifests with meaningful metadata.
       config_dirs:
         - manifest_config_dirs
       root_files:
@@ -73,9 +71,9 @@ config:
   repo_root_files:
     - README.md
     - readme.md
+    - deploy.yml
+    - deploy.yaml
     - package.json
-    - composer.json
-    - wp-config.php
     - Dockerfile
     - Makefile
     - makefile
@@ -93,13 +91,10 @@ config:
     - .github/workflows
     - Makefile
     - Dockerfile
-    - wp-config.php
-    - examples
     - docs
   repo_doc_paths:
     - .rabbit/context.yaml
     - CLAUDE.md
-    - AGENTS.md
     - README*
     - readme*
     - docs/*.md
@@ -117,38 +112,6 @@ config:
       paths:
         - README.md
         - readme.md
-    todo_notes:
-      prefix: notes
-      kind: file
-      paths:
-        - TODO.md
-        - todo.md
-    refs_notes:
-      prefix: notes
-      kind: file
-      paths:
-        - refs.md
-        - REFS.md
-    wordpress_framework:
-      prefix: framework
-      kind: file
-      paths:
-        - wp-config.php
-    node_manifest:
-      prefix: manifest
-      kind: file
-      paths:
-        - package.json
-    composer_manifest:
-      prefix: manifest
-      kind: file
-      paths:
-        - composer.json
-    docker_runtime:
-      prefix: runtime
-      kind: file
-      paths:
-        - Dockerfile
     deploy_files:
       prefix: deploy
       kind: file
@@ -166,8 +129,8 @@ config:
       kind: dir
       paths:
         - .github/workflows
-    udx_root:
-      prefix: udx
+    rabbit_root:
+      prefix: context
       kind: dir
       paths:
         - .rabbit

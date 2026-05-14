@@ -13,7 +13,7 @@ Installation only puts the command on the machine. Before relying on `dev.kit` f
 dev.kit
 ```
 
-`dev.kit` is the happy path. It checks the environment, refreshes repo context, and regenerates `AGENTS.md` when a repo is detected. Use `dev.kit repo` or `dev.kit agent` only when you want to refresh one layer independently.
+`dev.kit` is the happy path. It checks the environment, summarizes repo-local context status, and points to `dev.kit repo` when context is missing or stale.
 
 ## Upgrade
 
@@ -27,7 +27,7 @@ npm install -g @udx/dev-kit
 curl -fsSL https://raw.githubusercontent.com/udx/dev.kit/latest/bin/scripts/install.sh | bash
 ```
 
-The generated `AGENTS.md` guidance assumes agents start from a current `dev.kit` install before reading repo context.
+The generated `.rabbit/context.yaml` contract assumes a current `dev.kit` install before you regenerate repo context.
 
 ## Recommended Path
 
@@ -122,4 +122,4 @@ dev.kit env
 dev.kit env --config
 ```
 
-Use `dev.kit repo` and `dev.kit agent` separately only when one generated artifact needs to be refreshed on its own.
+Use `dev.kit repo` when `.rabbit/context.yaml` needs to be refreshed explicitly.

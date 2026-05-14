@@ -39,7 +39,7 @@ usage() {
   local description=""
   cat <<'EOF'
 Usage: dev.kit [--json]
-       dev.kit <command>
+       dev.kit [--json] <command> [options]
 
 Commands:
 EOF
@@ -62,7 +62,251 @@ EOF
 home_usage() {
   echo "Usage: dev.kit [--json]"
   echo
-  echo "Checks environment, refreshes repo context, and generates agent guidance when a repo is detected."
+  echo "Checks environment, then summarizes repo context when a repo is detected."
+}
+
+dev_kit_home_artifact_status() {
+  local artifact_path="$1"
+  if [ -f "$artifact_path" ]; then
+    printf '%s' "existing"
+    return 0
+  fi
+  printf '%s' "missing"
+}
+
+dev_kit_context_top_level_field() {
+  local context_yaml_path="$1"
+  local field_name="$2"
+
+  [ -f "$context_yaml_path" ] || return 0
+
+  awk -v field_name="$field_name" '
+    $0 ~ ("^" field_name ":[[:space:]]*") {
+      sub("^[^:]+:[[:space:]]*", "", $0)
+      print
+      exit
+    }
+  ' "$context_yaml_path"
+}
+
+dev_kit_context_section_item_count() {
+  local context_yaml_path="$1"
+  local section_name="$2"
+  local item_pattern="$3"
+
+  [ -f "$context_yaml_path" ] || { printf '0'; return 0; }
+
+  awk -v section_name="$section_name" -v item_pattern="$item_pattern" '
+    $0 == section_name ":" { in_section = 1; next }
+    in_section && /^[^[:space:]#]/ { exit }
+    in_section && $0 ~ item_pattern { count += 1 }
+    END { print count + 0 }
+  ' "$context_yaml_path"
+}
+
+dev_kit_context_first_refs() {
+  local context_yaml_path="$1"
+  local max_items="${2:-2}"
+
+  [ -f "$context_yaml_path" ] || return 0
+
+  awk -v max_items="$max_items" '
+    /^refs:/ { in_refs = 1; next }
+    in_refs && /^[^[:space:]#]/ { exit }
+    in_refs && /^  - / {
+      sub(/^  - /, "")
+      print
+      count += 1
+      if (count >= max_items) exit
+    }
+  ' "$context_yaml_path"
+}
+
+dev_kit_context_gap_lines() {
+  local context_yaml_path="$1"
+
+  [ -f "$context_yaml_path" ] || return 0
+
+  awk '
+    /^gaps:/ { in_gaps = 1; next }
+    in_gaps && /^[^[:space:]]/ { exit }
+    in_gaps && /^  - factor:/ {
+      if (gap_factor != "") {
+        line = gap_factor " (" gap_status "): " gap_message
+        if (gap_repair != "") {
+          line = line " | repair: " gap_repair
+        }
+        if (gap_reference != "") {
+          line = line " | reference: " gap_reference
+        }
+        print line
+      }
+      gap_factor = $0
+      sub(/^  - factor:[[:space:]]*/, "", gap_factor)
+      gap_status = ""
+      gap_message = ""
+      gap_repair = ""
+      gap_reference = ""
+      next
+    }
+    in_gaps && /^    status:/ {
+      gap_status = $0
+      sub(/^    status:[[:space:]]*/, "", gap_status)
+      next
+    }
+    in_gaps && /^    message:/ {
+      gap_message = $0
+      sub(/^    message:[[:space:]]*/, "", gap_message)
+      next
+    }
+    in_gaps && /^    repair_target:/ {
+      gap_repair = $0
+      sub(/^    repair_target:[[:space:]]*/, "", gap_repair)
+      next
+    }
+    in_gaps && /^    reference:/ {
+      gap_reference = $0
+      sub(/^    reference:[[:space:]]*/, "", gap_reference)
+      next
+    }
+    END {
+      if (gap_factor != "") {
+        line = gap_factor " (" gap_status "): " gap_message
+        if (gap_repair != "") {
+          line = line " | repair: " gap_repair
+        }
+        if (gap_reference != "") {
+          line = line " | reference: " gap_reference
+        }
+        print line
+      }
+    }
+  ' "$context_yaml_path"
+}
+
+dev_kit_home_context_summary_json() {
+  local context_yaml_path="$1"
+
+  if [ ! -f "$context_yaml_path" ]; then
+    printf 'null'
+    return 0
+  fi
+
+  printf '{ "refs": %s, "gaps": %s, "dependencies": %s, "manifests": %s }' \
+    "$(dev_kit_context_section_item_count "$context_yaml_path" "refs" '^  - ')" \
+    "$(dev_kit_context_section_item_count "$context_yaml_path" "gaps" '^  - factor:')" \
+    "$(dev_kit_context_section_item_count "$context_yaml_path" "dependencies" '^  - repo:')" \
+    "$(dev_kit_context_section_item_count "$context_yaml_path" "manifests" '^  - path:')"
+}
+
+dev_kit_context_repo_field() {
+  local context_yaml_path="$1"
+  local field_name="$2"
+
+  [ -f "$context_yaml_path" ] || return 0
+
+  awk -v field_name="$field_name" '
+    /^repo:/ { in_repo = 1; next }
+    in_repo && /^[^[:space:]]/ { exit }
+    in_repo && $1 == field_name ":" {
+      $1 = ""
+      sub(/^ /, "")
+      print
+      exit
+    }
+  ' "$context_yaml_path"
+}
+
+dev_kit_context_generator_field() {
+  local context_yaml_path="$1"
+  local field_name="$2"
+
+  [ -f "$context_yaml_path" ] || return 0
+
+  awk -v field_name="$field_name" '
+    /^generator:/ { in_generator = 1; next }
+    in_generator && /^[^[:space:]]/ { exit }
+    in_generator && $1 == field_name ":" {
+      $1 = ""
+      sub(/^ /, "")
+      print
+      exit
+    }
+  ' "$context_yaml_path"
+}
+
+dev_kit_home_expected_gap_lines() {
+  local repo_root="$1"
+
+  dev_kit_repo_factor_summary_json "$repo_root" | jq -r '
+    to_entries[] |
+    select(.value.status == "missing" or .value.status == "partial") |
+    "\(.key) (\(.value.status)): \(.value.message // "needs stronger repo evidence")\((if (.value.repair_target // "") != "" then " | repair: " + .value.repair_target else empty end))\((if (.value.reference // "") != "" then " | reference: " + .value.reference else empty end))"
+  ' 2>/dev/null || true
+}
+
+dev_kit_home_context_reason() {
+  local context_yaml_path="$1"
+  local repo_root="$2"
+  local context_kind=""
+  local context_version=""
+  local generator_tool=""
+  local generator_version=""
+  local generated_at=""
+  local context_repo_name=""
+  local current_repo_name=""
+  local context_archetype=""
+  local current_archetype=""
+  local current_gap_lines=""
+  local expected_gap_lines=""
+
+  [ -f "$context_yaml_path" ] || return 0
+
+  context_kind="$(dev_kit_context_top_level_field "$context_yaml_path" "kind")"
+  [ "$context_kind" = "repoContext" ] || {
+    printf '%s' "context kind does not match the current repo contract"
+    return 0
+  }
+
+  context_version="$(dev_kit_context_top_level_field "$context_yaml_path" "version")"
+  [ "$context_version" = "$(dev_kit_version_uri)" ] || {
+    printf '%s' "context contract version no longer matches current dev.kit output"
+    return 0
+  }
+
+  generator_tool="$(dev_kit_context_generator_field "$context_yaml_path" "tool")"
+  generator_version="$(dev_kit_context_generator_field "$context_yaml_path" "version")"
+  generated_at="$(dev_kit_context_generator_field "$context_yaml_path" "generated_at")"
+  if [ "$generator_tool" != "dev.kit" ] || [ -z "$generator_version" ] || [ -z "$generated_at" ]; then
+    printf '%s' "context generator metadata is missing or outdated"
+    return 0
+  fi
+
+  if [ -n "$(dev_kit_tool_version)" ] && [ "$generator_version" != "$(dev_kit_tool_version)" ]; then
+    printf '%s' "context was generated by a different dev.kit version"
+    return 0
+  fi
+
+  context_repo_name="$(dev_kit_context_repo_field "$context_yaml_path" "name")"
+  current_repo_name="$(dev_kit_repo_name "$repo_root")"
+  if [ -n "$context_repo_name" ] && [ "$context_repo_name" != "$current_repo_name" ]; then
+    printf '%s' "context repo name no longer matches the current repository"
+    return 0
+  fi
+
+  context_archetype="$(dev_kit_context_repo_field "$context_yaml_path" "archetype")"
+  current_archetype="$(dev_kit_repo_primary_archetype "$repo_root")"
+  if [ -n "$context_archetype" ] && [ "$context_archetype" != "$current_archetype" ]; then
+    printf '%s' "repo archetype no longer matches current repo signals"
+    return 0
+  fi
+
+  current_gap_lines="$(dev_kit_context_gap_lines "$context_yaml_path" | LC_ALL=C sort)"
+  expected_gap_lines="$(dev_kit_home_expected_gap_lines "$repo_root" | LC_ALL=C sort)"
+  if [ "$current_gap_lines" != "$expected_gap_lines" ]; then
+    printf '%s' "gap coverage no longer matches current repo evidence"
+    return 0
+  fi
 }
 
 dev_kit_run_home() {
@@ -72,25 +316,32 @@ dev_kit_run_home() {
   local repo_root="" repo_detected="false" repo_kind="workspace"
   local archetype="n/a" git_state="no"
   local priority_refs="" next_git_action=""
-  local context_yaml_path="" agents_md_path=""
+  local context_yaml_path=""
+  local context_status="none"
+  local context_reason=""
 
   repo_root="$(dev_kit_repo_root "$repo_dir")"
   if [ -n "$repo_root" ]; then
     repo_detected="true"
     repo_kind="repo"
-    archetype="$(dev_kit_repo_primary_archetype "$repo_root")"
     context_yaml_path="$(dev_kit_context_yaml_path "$repo_root")"
-    agents_md_path="${repo_root}/AGENTS.md"
-    if dev_kit_sync_has_git_repo "$repo_root"; then
-      git_state="yes"
+    context_status="$(dev_kit_home_artifact_status "$context_yaml_path")"
+    if [ "$context_status" = "existing" ]; then
+      context_reason="$(dev_kit_home_context_reason "$context_yaml_path" "$repo_root")"
+      if [ -n "$context_reason" ]; then
+        context_status="stale"
+      fi
     fi
-    priority_refs="$(dev_kit_repo_priority_refs "$repo_root")"
-    if [ "$git_state" = "yes" ]; then
-      next_git_action="$(dev_kit_sync_next_hint "$repo_root")"
+    if [ "$format" = "json" ]; then
+      archetype="$(dev_kit_repo_primary_archetype "$repo_root")"
+      if dev_kit_sync_has_git_repo "$repo_root"; then
+        git_state="yes"
+      fi
+      priority_refs="$(dev_kit_repo_priority_refs "$repo_root")"
+      if [ "$git_state" = "yes" ]; then
+        next_git_action="$(dev_kit_sync_next_hint "$repo_root")"
+      fi
     fi
-
-    dev_kit_context_yaml_write "$repo_root" >/dev/null
-    dev_kit_agent_write_agents_md "$repo_root" "$agents_md_path"
   fi
 
   if [ "$format" = "json" ]; then
@@ -119,21 +370,20 @@ dev_kit_run_home() {
     printf '  "synced": {\n'
     printf '    "repo_detected": %s,\n' "$repo_detected"
     printf '    "context": %s,\n' "$(if [ -n "$context_yaml_path" ]; then printf '"%s"' "$(dev_kit_json_escape "$context_yaml_path")"; else printf 'null'; fi)"
-    printf '    "agents_md": %s\n' "$(if [ -n "$agents_md_path" ]; then printf '"%s"' "$(dev_kit_json_escape "$agents_md_path")"; else printf 'null'; fi)"
+    printf '    "context_status": "%s",\n' "$(dev_kit_json_escape "$context_status")"
+    printf '    "context_reason": %s,\n' "$(if [ -n "$context_reason" ]; then printf '"%s"' "$(dev_kit_json_escape "$context_reason")"; else printf 'null'; fi)"
+    printf '    "summary": %s\n' "$(dev_kit_home_context_summary_json "$context_yaml_path")"
     printf '  },\n'
     printf '  "localhost_tools": %s,\n' "$(dev_kit_env_tools_json)"
     printf '  "global_context": { "capabilities": %s },\n' "$(dev_kit_global_context_capabilities_json)"
     if [ "$repo_detected" = "true" ] && [ "$git_state" = "yes" ]; then
       printf '  "start_here": %s,\n' "$(dev_kit_sync_start_here_json "$repo_root")"
-      printf '  "agent_contract": %s,\n' "$(dev_kit_repo_agent_contract_json "$repo_root")"
     else
       printf '  "start_here": [],\n'
-      printf '  "agent_contract": [],\n'
     fi
     printf '  "helpers": [\n'
     printf '    { "id": "env", "label": "Inspect environment tools and config", "command": "dev.kit env" },\n'
-    printf '    { "id": "repo", "label": "Analyse repo structure and factors", "command": "dev.kit repo" },\n'
-    printf '    { "id": "agent", "label": "Start an AI session with repo context", "command": "dev.kit agent" }\n'
+    printf '    { "id": "repo", "label": "Analyse repo structure and factors", "command": "dev.kit repo" }\n'
     printf '  ]\n'
     printf '}\n'
     return 0
@@ -159,24 +409,70 @@ EOF
 
   # ── Repo detection ──────────────────────────────────────────────────────────
   if [ -n "$repo_root" ]; then
-    dev_kit_spinner_start "syncing repo context"
-    archetype="$(dev_kit_repo_primary_archetype "$repo_root")"
+    local summary_name summary_archetype
+    summary_name="$(dev_kit_repo_name "$repo_root")"
+    summary_archetype="$(dev_kit_repo_primary_archetype "$repo_root")"
+    if [ "$context_status" = "existing" ]; then
+      local context_summary_name context_summary_archetype
+      context_summary_name="$(dev_kit_context_repo_field "$context_yaml_path" "name")"
+      context_summary_archetype="$(dev_kit_context_repo_field "$context_yaml_path" "archetype")"
+      [ -n "$context_summary_name" ] && summary_name="$context_summary_name"
+      [ -n "$context_summary_archetype" ] && summary_archetype="$context_summary_archetype"
+    fi
     context_yaml_path="$(dev_kit_context_yaml_path "$repo_root")"
-    agents_md_path="${repo_root}/AGENTS.md"
-    dev_kit_context_yaml_write "$repo_root" >/dev/null
-    dev_kit_agent_write_agents_md "$repo_root" "$agents_md_path"
-    dev_kit_spinner_stop ""
 
-    dev_kit_output_summary "$(dev_kit_repo_name "$repo_root") • ${archetype}"
+    dev_kit_output_summary "${summary_name} • ${summary_archetype}"
 
-    dev_kit_output_section "synced"
-    dev_kit_output_row "context" "$context_yaml_path"
-    dev_kit_output_row "agents" "$agents_md_path"
+    dev_kit_output_section "context"
+    dev_kit_output_row "path" "$context_yaml_path"
+    dev_kit_output_row "status" "$context_status"
+
+    if [ "$context_status" = "existing" ]; then
+      local factor status ref_count gap_count gap_lines ref_lines
+
+      dev_kit_output_section "coverage"
+      for factor in documentation dependencies config pipeline; do
+        status="$(dev_kit_repo_factor_status "$repo_root" "$factor")"
+        dev_kit_output_status_row "$factor" "$status"
+      done
+
+      ref_count="$(dev_kit_context_section_item_count "$context_yaml_path" "refs" '^  - ')"
+      dev_kit_output_section "refs"
+      dev_kit_output_row "count" "$ref_count"
+      ref_lines="$(dev_kit_context_first_refs "$context_yaml_path" 2)"
+      if [ -n "$ref_lines" ]; then
+        dev_kit_output_list_from_lines <<EOF
+$ref_lines
+EOF
+      fi
+
+      gap_count="$(dev_kit_context_section_item_count "$context_yaml_path" "gaps" '^  - factor:')"
+      dev_kit_output_section "gaps"
+      if [ "$gap_count" -gt 0 ]; then
+        gap_lines="$(dev_kit_context_gap_lines "$context_yaml_path")"
+        dev_kit_output_row "count" "$gap_count"
+        dev_kit_output_list_from_lines <<EOF
+$gap_lines
+EOF
+      else
+        dev_kit_output_list_item "none"
+      fi
+    elif [ "$context_status" = "stale" ]; then
+      [ -n "$context_reason" ] && dev_kit_output_row "reason" "$context_reason"
+      dev_kit_output_list_item 'Repo context is stale. Regenerate `.rabbit/context.yaml` before relying on repo-scoped guidance.'
+    else
+      dev_kit_output_list_item 'Repo context is missing. Generate `.rabbit/context.yaml` before relying on repo-scoped guidance.'
+    fi
 
     dev_kit_output_section "next"
-    dev_kit_output_row "env" "dev.kit env"
-    dev_kit_output_row "repo" "dev.kit repo"
-    dev_kit_output_row "agent" "dev.kit agent"
+    if [ "$context_status" = "existing" ]; then
+      dev_kit_output_row "context" "read .rabbit/context.yaml"
+      if [ "$(dev_kit_context_section_item_count "$context_yaml_path" "gaps" '^  - factor:')" -gt 0 ]; then
+        dev_kit_output_row "repair" "fix repo-owned gaps, then rerun dev.kit repo"
+      fi
+    else
+      dev_kit_output_row "repo" "dev.kit repo"
+    fi
   else
     dev_kit_output_summary "no repo detected at ${repo_dir}"
     dev_kit_output_section "next"
@@ -199,18 +495,29 @@ command_usage() {
       echo "  --json     Output machine-readable JSON"
       echo "  --config   Create or inspect the environment config file"
       ;;
-    agent)
-      echo "  --json     Output machine-readable JSON"
-      ;;
     uninstall)
+      echo "  --json     Output machine-readable JSON"
       echo "  --yes      Remove dev.kit without a confirmation prompt"
       ;;
   esac
 }
 
-command="${1:-home}"
 format="text"
 command_args=()
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --json)
+      format="json"
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+command="${1:-home}"
 
 if [ "$#" -gt 0 ]; then
   shift
@@ -227,11 +534,6 @@ while [ "$#" -gt 0 ]; do
   esac
   shift
 done
-
-if [ "$command" = "--json" ]; then
-  command="home"
-  format="json"
-fi
 
 if [ "$command" = "--version" ] || [ "$command" = "-v" ]; then
   awk -F'"' '/"version"/{print $4}' "$REPO_DIR/package.json"

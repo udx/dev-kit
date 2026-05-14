@@ -16,11 +16,13 @@ config:
     - docs/**/*.md
   prune_dirs:
     - .git
-    - wp-admin
-    - wp-content
-    - wp-includes
     - node_modules
     - .next
+    - .nuxt
+    - .svelte-kit
+    - .output
+    - .contentlayer
+    - .turbo
     - vendor
     - dist
     - .venv
@@ -28,8 +30,6 @@ config:
     - .terraform
     - build
     - coverage
-    - .nuxt
-    - .turbo
     - .cache
     - target
     - out
@@ -39,33 +39,10 @@ config:
     - Makefile
     - makefile
     - GNUmakefile
-  next_files:
-    - next.config.js
-    - next.config.mjs
-    - next.config.ts
-  wordpress_files:
-    - wp-config.php
-  wordpress_dirs:
-    - wp-content
-    - wp-content/plugins
-    - wp-content/themes
-    - wp-content/mu-plugins
   container_files:
     - Dockerfile
     - docker-compose.yml
     - docker-compose.yaml
-  container_globs:
-    - Dockerfile.*
-  dependency_manifest_files:
-    - package.json
-    - composer.json
-    - requirements.txt
-    - pyproject.toml
-    - go.mod
-    - Cargo.toml
-    - Gemfile
-  dependency_partial_files:
-    - Dockerfile
   config_contract_files:
     - .env.example
     - .env.sample
@@ -75,9 +52,6 @@ config:
     - docker-compose.yaml
     - deploy.yml
     - deploy.yaml
-  runtime_files:
-    - Dockerfile
-    - Procfile
   test_dirs:
     - tests
     - test
@@ -96,19 +70,6 @@ config:
     - deploy.yaml
     - docker-compose.yml
     - docker-compose.yaml
-  infra_dirs:
-    - terraform
-    - k8s
-    - cd
-  terraform_files:
-    - main.tf
-    - variables.tf
-  terraform_dirs:
-    - terraform
-  terraform_globs:
-    - terraform/*.tf
-    - terraform/**/*.tf
-    - "*.tf"
   yaml_manifest_globs:
     - "*.yaml"
     - "*.yml"
@@ -119,25 +80,13 @@ config:
   dependency_trace_container_files:
     - Dockerfile
   # Dirs scanned recursively for YAML files with kind/version headers.
-  # The version URI (e.g. udx.dev/rabbit-automation-action/gcp-sql-instance/v1)
-  # traces back to source repo and module. This is the primary cross-repo tracing
-  # mechanism — repos declare their infrastructure provider in the version field.
+  # Version URIs are normalized into source repo contracts when possible.
   dependency_trace_versioned_dirs:
     - .rabbit
   # Docker Compose files scanned for image: references.
   dependency_trace_compose_files:
     - docker-compose.yml
     - docker-compose.yaml
-  # File globs scanned for GitHub URL references (github.com/org/repo patterns).
-  # Applied within priority ref dirs and repo root config files.
-  dependency_trace_url_globs:
-    - "*.yaml"
-    - "*.yml"
-    - "*.md"
-  # Manifest files that define where this repo is hosted/deployed.
-  # Listed as config manifests in context.yaml output.
-  manifest_workflow_dirs:
-    - .github/workflows
   manifest_config_dirs:
     - src/configs
     - configs

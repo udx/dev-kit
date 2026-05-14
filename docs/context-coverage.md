@@ -12,19 +12,30 @@ It should answer three questions:
 
 `context.yaml` is for facts and deterministic transforms built from repo signals.
 
+For the boundary between generated contract data and durable repo docs, see [Repo Contract Boundary](repo-contract-boundary.md).
+
 Typical sections include:
 
+- generator metadata
 - repo identity
 - direct-read refs
 - detected verify, build, and run commands with source hints
 - structured gaps with factor, status, message, and evidence
 - manifests as structured entries
-- dependencies
+- meaningful external contracts such as reusable workflows, images, versioned manifests, and dependency repos
 
-Depending on the repo and environment, it may also include live repo experience that can be serialized safely.
-Dynamic GitHub state such as issues, pull requests, reviews, workflow runs, and alerts is intentionally not serialized. Agents should fetch those live with `gh` when the current task needs them.
+Live GitHub state such as issues, pull requests, reviews, workflow runs, and alerts is intentionally not serialized. `context.yaml` should stay focused on repo-owned signals and deterministic dependency traces.
 
 This is important: `context.yaml` is not trying to be a complete narrative. It is trying to be a usable contract with explicit coverage boundaries.
+
+Observed facts and inferred relationships should stay visibly separate.
+
+For example:
+
+- manifest paths, workflow refs, and command sources are observed facts
+- normalized dependency ownership or same-org repo matches are inferred relationships
+
+That keeps the contract reviewable instead of magical.
 
 ## What Gaps Mean
 
@@ -57,19 +68,34 @@ Gaps are meant to drive a repair loop:
 
 That means gaps are part of maximum context discovery, not just an error report.
 
+Example:
+
+```yaml
+gaps:
+  - factor: config
+    status: missing
+    message: No explicit configuration contract was detected.
+```
+
+That should lead to a repo change such as adding config docs, manifest metadata, or a checked-in example file, then regenerating context.
+
 ## What Does Not Belong There
 
 `context.yaml` should not become a prompt or a workflow script.
 
 It is not the right place for:
 
-- agent behavior rules
+- consumer behavior rules
 - long-form operating guidance
 - issue or PR handling advice
-- subjective reasoning about what an agent should do next
+- subjective reasoning about what a consumer should do next
 - local-only lesson artifacts
 
-Those belong in `AGENTS.md`.
+Those should stay outside the generated repo contract.
+
+If a repo wants explicit behavior guidance for agents or reviewers, keep that in repo-owned docs or instruction files such as `AGENTS.md` or `CLAUDE.md`, not in `context.yaml`.
+
+If a gap needs reusable interpretation guidance, prefer a compact reference in `docs/references/` over embedding that explanation into generated output.
 
 ## Coverage Strategy
 
@@ -77,8 +103,10 @@ The coverage model is repo-first:
 
 - read README, docs, manifests, workflows, tests, and deploy config
 - detect commands and factor signals
-- trace deterministic dependencies
+- trace deterministic custom contracts
 - report gaps where coverage is weak
+
+When Git metadata is available, deep file-usage scans should prefer tracked and unignored files so generated artifacts and dependency caches do not dominate context generation.
 
 That keeps `context.yaml` useful both for healthy repos and for repos that need cleanup.
 

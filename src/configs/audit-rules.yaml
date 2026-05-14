@@ -7,23 +7,23 @@ config:
     - id: missing-documentation
       factor: documentation
       status: missing
-      message: Add a README so humans and agents can orient quickly around purpose, workflow, and boundaries.
+      message: Add a README so repo consumers can orient quickly around purpose, workflow, and boundaries.
     - id: partial-dependency-contract
       factor: dependencies
       status: partial
-      message: Runtime signals exist, but the dependency contract is incomplete. Prefer an explicit language or package manifest over container-only dependency discovery.
-    - id: missing-dependency-manifest
+      message: Custom execution-shaping contracts exist, but they are not traced clearly yet. Prefer versioned manifests, reusable workflow refs, image refs, or in-repo docs/source links over implicit tool knowledge.
+    - id: missing-dependency-contract
       factor: dependencies
       status: missing
-      message: Add an explicit dependency manifest so builds and runtime assumptions do not depend on tribal knowledge.
+      message: No meaningful external contract was detected. When repo behavior depends on external workflows, images, or custom manifests, add metadata or docs that trace those relationships clearly.
     - id: partial-config-contract
       factor: config
       status: partial
-      message: Config signals exist, but no explicit env contract file was detected. Add .env.example, .env.sample, or .env.template when runtime configuration is required.
+      message: Config signals exist, but the repo does not declare a clear configuration contract yet. Document required config in repo-owned docs, manifest metadata, or checked-in example files when they fit the repo design.
     - id: missing-config-contract
       factor: config
       status: missing
-      message: No explicit configuration contract was detected. Add runtime config docs or an env example when the repo requires environment configuration.
+      message: No explicit configuration contract was detected. Add repo-owned docs, manifest metadata, or checked-in example files that explain the required configuration.
     - id: partial-pipeline
       factor: pipeline
       status: partial

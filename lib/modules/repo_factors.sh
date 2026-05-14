@@ -1,5 +1,59 @@
 #!/usr/bin/env bash
 
+dev_kit_repo_has_reusable_workflow_contract() {
+  local repo_dir="$1"
+  if [ -n "$(dev_kit_repo_reusable_workflow_contract_files "$repo_dir")" ]; then
+    return 0
+  fi
+
+  return 1
+}
+
+dev_kit_repo_contract_manifest_versioned_files() {
+  local repo_dir="$1"
+  local manifest_rel=""
+  local manifest_path=""
+
+  while IFS= read -r manifest_rel; do
+    [ -n "$manifest_rel" ] || continue
+    manifest_path="${repo_dir}/${manifest_rel}"
+    [ -f "$manifest_path" ] || continue
+    if [ -n "$(dev_kit_manifest_version_value "$manifest_path")" ]; then
+      printf '%s\n' "$manifest_rel"
+    fi
+  done <<EOF
+$(dev_kit_repo_contract_manifest_files "$repo_dir")
+EOF
+}
+
+dev_kit_repo_has_contract_manifest_surface() {
+  local repo_dir="$1"
+
+  [ -n "$(dev_kit_repo_contract_manifest_files "$repo_dir")" ]
+}
+
+dev_kit_repo_has_meaningful_dependency_contract() {
+  local repo_dir="$1"
+
+  if dev_kit_repo_has_reusable_workflow_contract "$repo_dir"; then
+    return 0
+  fi
+
+  if dev_kit_repo_has_any_file_from_list "$repo_dir" "container_files"; then
+    return 0
+  fi
+
+  if dev_kit_repo_has_any_file_from_list "$repo_dir" "dependency_trace_compose_files"; then
+    return 0
+  fi
+
+  if [ -n "$(dev_kit_repo_contract_manifest_versioned_files "$repo_dir")" ]; then
+    return 0
+  fi
+
+  return 1
+}
+
 dev_kit_repo_factor_applicable() {
   local repo_dir="$1"
   local factor="$2"
@@ -9,14 +63,8 @@ dev_kit_repo_factor_applicable() {
       return 0
       ;;
     dependencies)
-      # Always applicable for archetypes that must have dependency manifests
-      if dev_kit_repo_has_archetype "$repo_dir" "application" || \
-         dev_kit_repo_has_archetype "$repo_dir" "runtime-image"; then
-        return 0
-      fi
-      # For all other archetypes: only applicable if manifest files exist
-      if dev_kit_repo_has_any_file_from_list "$repo_dir" "dependency_manifest_files" || \
-         dev_kit_repo_has_any_file_from_list "$repo_dir" "dependency_partial_files"; then
+      if dev_kit_repo_has_meaningful_dependency_contract "$repo_dir" || \
+         dev_kit_repo_has_contract_manifest_surface "$repo_dir"; then
         return 0
       fi
       return 1
@@ -63,9 +111,9 @@ _dev_kit_repo_factor_status_compute() {
       fi
       ;;
     dependencies)
-      if dev_kit_repo_has_any_file_from_list "$repo_dir" "dependency_manifest_files"; then
+      if dev_kit_repo_has_meaningful_dependency_contract "$repo_dir"; then
         printf "%s" "present"
-      elif dev_kit_repo_has_any_file_from_list "$repo_dir" "dependency_partial_files"; then
+      elif dev_kit_repo_has_contract_manifest_surface "$repo_dir"; then
         printf "%s" "partial"
       else
         printf "%s" "missing"
@@ -86,8 +134,7 @@ _dev_kit_repo_factor_status_compute() {
          (dev_kit_repo_has_make_target "$repo_dir" "test" || \
           dev_kit_repo_has_node_test_script "$repo_dir" || \
           dev_kit_repo_has_composer_test_script "$repo_dir" || \
-          dev_kit_repo_has_any_file_from_list "$repo_dir" "deploy_files" || \
-          dev_kit_repo_has_any_dir_from_list "$repo_dir" "infra_dirs"); then
+          dev_kit_repo_has_any_file_from_list "$repo_dir" "deploy_files"); then
         printf "%s" "present"
       elif dev_kit_repo_has_any_glob_from_list "$repo_dir" "workflow_globs" || \
            dev_kit_repo_has_any_dir_from_list "$repo_dir" "test_dirs" || \
@@ -143,14 +190,35 @@ EOF
       fi
       ;;
     dependencies)
+      if dev_kit_repo_has_reusable_workflow_contract "$repo_dir"; then
+        evidence="${evidence}reusable workflow ref
+"
+      fi
       while IFS= read -r path; do
         [ -n "$path" ] || continue
         if dev_kit_has_file "$repo_dir" "$path"; then
-          evidence="${evidence}${path}
+          evidence="${evidence}image contract: ${path}
 "
         fi
       done <<EOF
-$(printf '%s\n%s\n' "$(dev_kit_detection_list "dependency_manifest_files")" "$(dev_kit_detection_list "dependency_partial_files")")
+$(printf '%s\n%s\n' "$(dev_kit_detection_list "container_files")" "$(dev_kit_detection_list "dependency_trace_compose_files")")
+EOF
+      while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        evidence="${evidence}versioned manifest: ${path}
+"
+      done <<EOF
+$(dev_kit_repo_contract_manifest_versioned_files "$repo_dir")
+EOF
+      while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        case "$evidence" in
+          *"versioned manifest: ${path}"*) continue ;;
+        esac
+        evidence="${evidence}custom manifest surface: ${path}
+"
+      done <<EOF
+$(dev_kit_repo_contract_manifest_files "$repo_dir")
 EOF
       ;;
     config)
@@ -213,15 +281,6 @@ EOF
       done <<EOF
 $(dev_kit_detection_list "deploy_files")
 EOF
-      while IFS= read -r path; do
-        [ -n "$path" ] || continue
-        if dev_kit_repo_has_dir "$repo_dir" "$path"; then
-          evidence="${evidence}${path}/
-"
-        fi
-      done <<EOF
-$(dev_kit_detection_list "infra_dirs")
-EOF
       while IFS= read -r pattern; do
         [ -n "$pattern" ] || continue
         if dev_kit_repo_has_glob "$repo_dir" "$pattern"; then
@@ -246,6 +305,43 @@ EOF
 
 dev_kit_repo_factor_evidence_json() {
   dev_kit_repo_factor_evidence "$1" "$2" | dev_kit_lines_to_json_array
+}
+
+dev_kit_repo_factor_summary_json() {
+  local repo_dir="$1"
+  local factor=""
+  local status=""
+  local first=1
+
+  printf "{"
+  while IFS= read -r factor; do
+    status="$(dev_kit_repo_factor_status "$repo_dir" "$factor")"
+    if [ "$first" -eq 0 ]; then
+      printf ","
+    fi
+    printf '\n    "%s": {' "$factor"
+    printf '\n      "status": "%s",' "$status"
+    printf '\n      "evidence": '
+    dev_kit_repo_factor_evidence_json "$repo_dir" "$factor"
+    if [ "$status" = "missing" ] || [ "$status" = "partial" ]; then
+      local _msg _repair _reference
+      _msg="$(dev_kit_repo_factor_message "$repo_dir" "$factor" "$status" 2>/dev/null || true)"
+      _repair="$(dev_kit_repo_factor_repair_target "$repo_dir" "$factor" "$status" 2>/dev/null || true)"
+      _reference="$(dev_kit_repo_factor_reference "$repo_dir" "$factor" "$status" 2>/dev/null || true)"
+      [ -n "$_msg" ] && printf ',\n      "message": "%s"' "$(dev_kit_json_escape "$_msg")"
+      [ -n "$_repair" ] && printf ',\n      "repair_target": "%s"' "$(dev_kit_json_escape "$_repair")"
+      [ -n "$_reference" ] && printf ',\n      "reference": "%s"' "$(dev_kit_json_escape "$_reference")"
+    fi
+    if dev_kit_repo_factor_entrypoint "$repo_dir" "$factor" >/dev/null 2>&1; then
+      printf ',\n      "entrypoint": "%s"\n    }' "$(dev_kit_repo_factor_entrypoint "$repo_dir" "$factor")"
+    else
+      printf '\n    }'
+    fi
+    first=0
+  done <<EOF
+$(dev_kit_repo_factor_ids)
+EOF
+  printf '\n  }'
 }
 
 dev_kit_repo_command_kind_id() {
@@ -362,13 +458,214 @@ dev_kit_repo_factor_ids() {
   printf '%s\n' documentation dependencies config pipeline
 }
 
+dev_kit_repo_first_existing_signal() {
+  local repo_dir="$1"
+  local list_name="$2"
+  local path=""
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if dev_kit_has_file "$repo_dir" "$path" || dev_kit_repo_has_dir "$repo_dir" "$path"; then
+      printf '%s' "$path"
+      return 0
+    fi
+  done <<EOF
+$(dev_kit_detection_list "$list_name")
+EOF
+
+  return 1
+}
+
+dev_kit_repo_factor_message() {
+  local repo_dir="$1"
+  local factor="$2"
+  local status="$3"
+  local rule_id=""
+  local fallback=""
+  local runtime_config=""
+  local config_doc=""
+  local manifest_path=""
+  local workflow_path=""
+  local test_path=""
+  local deploy_path=""
+  local container_path=""
+  local found=""
+
+  rule_id="$(dev_kit_repo_factor_rule_id "$factor" "$status" 2>/dev/null || true)"
+  fallback="$([ -n "$rule_id" ] && dev_kit_rule_message "$rule_id" || printf '%s is %s' "$factor" "$status")"
+
+  case "${factor}:${status}" in
+    config:partial)
+      runtime_config="$(dev_kit_repo_first_existing_signal "$repo_dir" "config_runtime_files" 2>/dev/null || true)"
+      config_doc="$(dev_kit_repo_documented_env_var_sources "$repo_dir" | awk 'NF { print; exit }')"
+      if [ -n "$runtime_config" ] && [ -n "$config_doc" ]; then
+        printf '%s' "Found config-bearing repo assets in ${runtime_config} and documented config in ${config_doc}, but no single checked-in config contract is declared yet."
+        return 0
+      fi
+      if [ -n "$runtime_config" ]; then
+        printf '%s' "Found config-bearing repo assets in ${runtime_config}, but no canonical checked-in config contract is declared yet."
+        return 0
+      fi
+      if [ -n "$config_doc" ]; then
+        printf '%s' "Configuration is documented in ${config_doc}, but the repo does not declare a canonical checked-in config contract yet."
+        return 0
+      fi
+      ;;
+    config:missing)
+      printf '%s' "No repo-owned configuration contract was found in docs, manifests, or checked-in example files."
+      return 0
+      ;;
+    dependencies:partial)
+      manifest_path="$(dev_kit_repo_contract_manifest_files "$repo_dir" | awk 'NF { print; exit }')"
+      if [ -n "$manifest_path" ]; then
+        printf '%s' "Found custom manifest surface in ${manifest_path}, but the dependency contract is not traced clearly yet."
+        return 0
+      fi
+      ;;
+    pipeline:partial)
+      workflow_path="$(dev_kit_repo_find_from_glob_list "$repo_dir" "workflow_globs" | awk -v repo="$repo_dir/" 'NF { sub("^" repo, ""); print; exit }')"
+      test_path="$(dev_kit_repo_first_existing_signal "$repo_dir" "test_dirs" 2>/dev/null || true)"
+      deploy_path="$(dev_kit_repo_first_existing_signal "$repo_dir" "deploy_files" 2>/dev/null || true)"
+      container_path="$(dev_kit_repo_first_existing_signal "$repo_dir" "container_files" 2>/dev/null || true)"
+      [ -n "$workflow_path" ] && found="$workflow_path"
+      [ -n "$test_path" ] && found="${found:+$found, }$test_path"
+      [ -n "$deploy_path" ] && found="${found:+$found, }$deploy_path"
+      [ -n "$container_path" ] && found="${found:+$found, }$container_path"
+      if [ -n "$found" ]; then
+        printf '%s' "Found partial pipeline signals in ${found}, but the repo does not declare a complete validation/deploy contract yet."
+        return 0
+      fi
+      ;;
+  esac
+
+  printf '%s' "$fallback"
+}
+
+dev_kit_repo_factor_repair_target() {
+  local repo_dir="$1"
+  local factor="$2"
+  local status="$3"
+  local runtime_config=""
+  local config_doc=""
+  local first_doc=""
+  local first_manifest=""
+  local first_workflow=""
+
+  case "${factor}:${status}" in
+    documentation:missing)
+      if dev_kit_has_file "$repo_dir" "README.md"; then
+        printf '%s' "README.md"
+        return 0
+      fi
+      printf '%s' "README.md or docs/"
+      return 0
+      ;;
+    dependencies:partial)
+      first_manifest="$(dev_kit_repo_contract_manifest_files "$repo_dir" | awk 'NF { print; exit }')"
+      if [ -n "$first_manifest" ]; then
+        printf '%s' "$first_manifest"
+        return 0
+      fi
+      first_workflow="$(dev_kit_repo_first_existing_signal "$repo_dir" "workflow_primary_files" 2>/dev/null || true)"
+      if [ -n "$first_workflow" ]; then
+        printf '%s' "$first_workflow"
+        return 0
+      fi
+      printf '%s' "deploy.yml or .github/workflows/"
+      return 0
+      ;;
+    dependencies:missing)
+      first_workflow="$(dev_kit_repo_first_existing_signal "$repo_dir" "workflow_primary_files" 2>/dev/null || true)"
+      if [ -n "$first_workflow" ]; then
+        printf '%s' "$first_workflow"
+        return 0
+      fi
+      printf '%s' "deploy.yml or .github/workflows/"
+      return 0
+      ;;
+    config:partial)
+      runtime_config="$(dev_kit_repo_first_existing_signal "$repo_dir" "config_runtime_files" 2>/dev/null || true)"
+      config_doc="$(dev_kit_repo_documented_env_var_sources "$repo_dir" | awk 'NF { print; exit }')"
+      if [ -n "$config_doc" ] && [ -n "$runtime_config" ]; then
+        printf '%s' "${config_doc} or .env.example"
+        return 0
+      fi
+      if [ -n "$config_doc" ]; then
+        printf '%s' "${config_doc} or .env.example"
+        return 0
+      fi
+      if [ -n "$runtime_config" ]; then
+        printf '%s' "${runtime_config} or .env.example"
+        return 0
+      fi
+      printf '%s' ".env.example or repo config docs"
+      return 0
+      ;;
+    config:missing)
+      if dev_kit_has_file "$repo_dir" "README.md"; then
+        printf '%s' "README.md or .env.example"
+        return 0
+      fi
+      printf '%s' ".env.example or docs/config.md"
+      return 0
+      ;;
+    pipeline:partial|pipeline:missing)
+      if dev_kit_has_file "$repo_dir" "package.json"; then
+        printf '%s' "package.json scripts.test"
+        return 0
+      fi
+      if dev_kit_has_file "$repo_dir" "composer.json"; then
+        printf '%s' "composer.json scripts.test"
+        return 0
+      fi
+      if dev_kit_has_file "$repo_dir" "Makefile"; then
+        printf '%s' "Makefile:test"
+        return 0
+      fi
+      first_workflow="$(dev_kit_repo_first_existing_signal "$repo_dir" "workflow_primary_files" 2>/dev/null || true)"
+      if [ -n "$first_workflow" ]; then
+        printf '%s' "$first_workflow"
+        return 0
+      fi
+      printf '%s' ".github/workflows/ or canonical verify command"
+      return 0
+      ;;
+  esac
+
+  first_doc="$(dev_kit_repo_first_existing_signal "$repo_dir" "documentation_files" 2>/dev/null || true)"
+  [ -n "$first_doc" ] && printf '%s' "$first_doc"
+}
+
+dev_kit_repo_factor_reference() {
+  local factor="$1"
+  local status="$2"
+  local maybe_status="$3"
+
+  if [ -n "${maybe_status:-}" ]; then
+    factor="$2"
+    status="$3"
+  fi
+
+  case "${factor}:${status}" in
+    dependencies:partial|dependencies:missing)
+      printf '%s' "docs/references/dependency-contracts.md"
+      ;;
+    config:partial|config:missing)
+      printf '%s' "docs/references/config-contract-surfaces.md"
+      ;;
+    pipeline:partial|pipeline:missing)
+      printf '%s' "docs/references/command-surfaces.md"
+      ;;
+  esac
+}
+
 dev_kit_repo_factor_rule_id() {
   local factor="$1"
   local status="$2"
 
   case "${factor}:${status}" in
     documentation:missing) printf "%s" "missing-documentation" ;;
-    dependencies:missing) printf "%s" "missing-dependency-manifest" ;;
+    dependencies:missing) printf "%s" "missing-dependency-contract" ;;
     dependencies:partial) printf "%s" "partial-dependency-contract" ;;
     config:missing) printf "%s" "missing-config-contract" ;;
     config:partial) printf "%s" "partial-config-contract" ;;

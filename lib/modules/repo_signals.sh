@@ -213,6 +213,20 @@ EOF
   find "$repo_dir" "(" "${prune_args[@]}" ")" -prune -o "$@"
 }
 
+dev_kit_repo_content_files() {
+  local repo_dir="$1"
+
+  if dev_kit_sync_has_git_repo "$repo_dir"; then
+    (
+      cd "$repo_dir" &&
+      git ls-files -z --cached --others --exclude-standard 2>/dev/null
+    ) | tr '\0' '\n' | awk -v repo_dir="$repo_dir" 'NF { printf "%s/%s\n", repo_dir, $0 }'
+    return 0
+  fi
+
+  dev_kit_repo_find "$repo_dir" -type f 2>/dev/null
+}
+
 dev_kit_repo_has_glob() {
   local repo_dir="$1"
   local pattern="$2"
@@ -382,21 +396,11 @@ dev_kit_repo_documented_command() {
   local repo_dir="$1"
   local kind="$2"
   local doc_file=""
-  local regex=""
   local command=""
 
-  regex="$(dev_kit_detection_pattern "$kind")"
-  [ -n "$regex" ] || return 1
-
   while IFS= read -r doc_file; do
-    command="$(awk -v regex="$regex" '
-      match($0, regex) {
-        command = substr($0, RSTART, RLENGTH)
-        gsub(/^`|`$/, "", command)
-        print command
-        exit
-      }
-    ' "$doc_file")"
+    [ -n "$doc_file" ] || continue
+    command="$(dev_kit_repo_extract_first_pattern_command_from_file "$doc_file" "$kind" 2>/dev/null || true)"
     if [ -n "$command" ]; then
       printf "%s" "$command"
       return 0
@@ -404,6 +408,33 @@ dev_kit_repo_documented_command() {
   done <<EOF
 $(dev_kit_repo_command_doc_files "$repo_dir")
 EOF
+
+  return 1
+}
+
+dev_kit_repo_extract_first_pattern_command_from_file() {
+  local file_path="$1"
+  local pattern_name="$2"
+  local doc_file=""
+  local regex=""
+  local command=""
+
+  regex="$(dev_kit_detection_pattern "$pattern_name")"
+  [ -n "$regex" ] || return 1
+  [ -f "$file_path" ] || return 1
+
+  command="$(awk -v regex="$regex" '
+    match($0, regex) {
+      command = substr($0, RSTART, RLENGTH)
+      gsub(/^`|`$/, "", command)
+      print command
+      exit
+    }
+  ' "$file_path")"
+  if [ -n "$command" ]; then
+    printf "%s" "$command"
+    return 0
+  fi
 
   return 1
 }
@@ -428,6 +459,93 @@ $(dev_kit_repo_command_doc_files "$repo_dir")
 EOF
 
   return 1
+}
+
+dev_kit_repo_documented_verification_sequence_result() {
+  local repo_dir="$1"
+  local doc_file=""
+  local doc_rel=""
+  local lint_cmd=""
+  local verify_cmd=""
+  local build_cmd=""
+  local commands=""
+  local command=""
+  local command_count=0
+
+  while IFS= read -r doc_file; do
+    [ -n "$doc_file" ] || continue
+    doc_rel="${doc_file#"${repo_dir}/"}"
+    lint_cmd="$(dev_kit_repo_extract_first_pattern_command_from_file "$doc_file" "lint" 2>/dev/null || true)"
+    verify_cmd="$(dev_kit_repo_extract_first_pattern_command_from_file "$doc_file" "verification" 2>/dev/null || true)"
+    build_cmd="$(dev_kit_repo_extract_first_pattern_command_from_file "$doc_file" "build" 2>/dev/null || true)"
+    commands=""
+
+    while IFS= read -r command; do
+      [ -n "$command" ] || continue
+      case "
+$commands
+" in
+        *"
+$command
+"*) continue ;;
+      esac
+      commands="${commands}${command}
+"
+    done <<EOF
+$lint_cmd
+$verify_cmd
+$build_cmd
+EOF
+
+    command_count="$(printf '%s' "$commands" | awk 'NF { count += 1 } END { print count + 0 }')"
+    if [ "$command_count" -ge 2 ]; then
+      printf '%s|%s\n' "$doc_rel" "$(printf '%s' "$commands" | awk 'NF { if (out != "") out = out " && "; out = out $0 } END { print out }')"
+      return 0
+    fi
+  done <<EOF
+$(dev_kit_repo_command_doc_files "$repo_dir")
+EOF
+
+  return 1
+}
+
+dev_kit_repo_contract_doc_refs() {
+  local repo_dir="$1"
+  local doc_file=""
+  local doc_rel=""
+
+  while IFS= read -r doc_file; do
+    [ -n "$doc_file" ] || continue
+    doc_rel="${doc_file#"${repo_dir}/"}"
+    case "$doc_rel" in
+      README.md|README|readme.md|changes.md|CHANGELOG.md) continue ;;
+    esac
+
+    if grep -Eq '(^|[(/[:space:]])(\.github/workflows/|\.rabbit/)' "$doc_file" 2>/dev/null || \
+       dev_kit_repo_extract_first_pattern_command_from_file "$doc_file" "verification" >/dev/null 2>&1 || \
+       dev_kit_repo_extract_first_pattern_command_from_file "$doc_file" "lint" >/dev/null 2>&1 || \
+       dev_kit_repo_extract_first_pattern_command_from_file "$doc_file" "build" >/dev/null 2>&1; then
+      printf './%s\n' "$doc_rel"
+    fi
+  done <<EOF
+$(dev_kit_repo_command_doc_files "$repo_dir")
+EOF
+}
+
+dev_kit_repo_contract_manifest_refs() {
+  local repo_dir="$1"
+  local manifest_rel=""
+
+  while IFS= read -r manifest_rel; do
+    [ -n "$manifest_rel" ] || continue
+    case "$manifest_rel" in
+      .rabbit/*.yml|.rabbit/*.yaml|*.yml|*.yaml)
+        printf './%s\n' "$manifest_rel"
+        ;;
+    esac
+  done <<EOF
+$(dev_kit_repo_contract_manifest_files "$repo_dir")
+EOF
 }
 
 dev_kit_repo_has_make_target() {
@@ -472,33 +590,6 @@ dev_kit_repo_has_node_build_script() {
 
 dev_kit_repo_has_node_start_script() {
   dev_kit_repo_manifest_has_script "$1" "package.json" "start"
-}
-
-dev_kit_repo_has_node_bin() {
-  local repo_dir="$1"
-
-  [ -f "$repo_dir/package.json" ] || return 1
-  jq -e '.bin // empty' "$repo_dir/package.json" >/dev/null 2>&1
-}
-
-dev_kit_repo_has_node_package() {
-  local repo_dir="$1"
-  local package_name="$2"
-
-  [ -f "$repo_dir/package.json" ] || return 1
-  jq -e --arg package_name "$package_name" '
-    ((.dependencies // {}) + (.devDependencies // {}))[$package_name] // empty
-  ' "$repo_dir/package.json" >/dev/null 2>&1
-}
-
-dev_kit_repo_has_next_app() {
-  local repo_dir="$1"
-
-  if dev_kit_repo_has_any_file_from_list "$repo_dir" "next_files"; then
-    return 0
-  fi
-
-  dev_kit_repo_has_node_package "$repo_dir" "next"
 }
 
 dev_kit_repo_has_composer_test_script() {
