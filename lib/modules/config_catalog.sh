@@ -32,6 +32,10 @@ dev_kit_repo_validation_list() {
   dev_kit_yaml_config_list "$(dev_kit_repo_validation_config_path)" "$1"
 }
 
+dev_kit_repo_validation_scalar() {
+  dev_kit_yaml_mapping_scalar "$(dev_kit_repo_validation_config_path)" "$1" "$2"
+}
+
 dev_kit_context_list() {
   dev_kit_yaml_config_list "$(dev_kit_context_config_path)" "$1"
 }

@@ -6,13 +6,21 @@ TEST_HOME="${DEV_KIT_TEST_HOME:-$(mktemp -d "${TMPDIR:-/tmp}/dev-kit-real-repos.
 DEV_KIT_BIN_DIR="$TEST_HOME/.local/bin"
 KEEP_HOME="${DEV_KIT_TEST_KEEP_HOME:-0}"
 REAL_REPOS_CSV="${DEV_KIT_TEST_REAL_REPOS:-}"
-MODE="check"
 REPORT_DIR="${DEV_KIT_TEST_REPORT_DIR:-$TEST_HOME/reports}"
-COMMAND_SOFT_TIMEOUT="${DEV_KIT_TEST_SOFT_TIMEOUT:-15}"
-COMMAND_HARD_TIMEOUT="${DEV_KIT_TEST_HARD_TIMEOUT:-180}"
 
 # shellcheck disable=SC1091
+. "$REPO_DIR/lib/modules/utils.sh"
+# shellcheck disable=SC1091
+. "$REPO_DIR/lib/modules/config_catalog.sh"
+# shellcheck disable=SC1091
 . "$REPO_DIR/lib/modules/output.sh"
+
+MODE="${DEV_KIT_TEST_MODE:-$(dev_kit_repo_validation_scalar "real_repo_probe" "default_mode")}"
+MODE="${MODE:-check}"
+COMMAND_SOFT_TIMEOUT="${DEV_KIT_TEST_SOFT_TIMEOUT:-$(dev_kit_repo_validation_scalar "real_repo_probe" "soft_timeout_seconds")}"
+COMMAND_SOFT_TIMEOUT="${COMMAND_SOFT_TIMEOUT:-15}"
+COMMAND_HARD_TIMEOUT="${DEV_KIT_TEST_HARD_TIMEOUT:-$(dev_kit_repo_validation_scalar "real_repo_probe" "hard_timeout_seconds")}"
+COMMAND_HARD_TIMEOUT="${COMMAND_HARD_TIMEOUT:-180}"
 
 usage() {
   cat <<'EOF'

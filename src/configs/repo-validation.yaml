@@ -3,6 +3,10 @@ version: udx.dev/dev.kit/v1
 description: Public repo probes and validation defaults for dev.kit release checks
 
 config:
+  real_repo_probe:
+    default_mode: check
+    soft_timeout_seconds: 15
+    hard_timeout_seconds: 180
   recommended_repos:
     - https://github.com/udx/worker
     - https://github.com/udx/reusable-workflows
