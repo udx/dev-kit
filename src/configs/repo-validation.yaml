@@ -15,15 +15,15 @@ config:
     - udx/reusable-workflows
     - udx/github-rabbit-action
   real_repo_matrix:
-    site_enc_apps:
-      repo: udx/site-enc-apps
-      purpose: many .rabbit/infra_configs environment definitions; validates manifest coverage without flooding first-read refs
-    gh_workflows:
-      repo: udx/gh-workflows
-      purpose: workflow-heavy repo; validates pipeline and reusable workflow context
-    rabbit_automation_action:
-      repo: udx/rabbit-automation-action
-      purpose: action, container, docs, and workflow mix
+    worker:
+      repo: udx/worker
+      purpose: worker manifest and deployment contract sanity check
+    reusable_workflows:
+      repo: udx/reusable-workflows
+      purpose: reusable workflow contracts and docs-first workflow context
+    github_rabbit_action:
+      repo: udx/github-rabbit-action
+      purpose: action, docs, and workflow context mix
     dev_kit:
       repo: udx/dev.kit
       purpose: self-hosting sanity check

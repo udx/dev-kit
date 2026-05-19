@@ -310,15 +310,8 @@ EOF
 
 dev_kit_manifest_source_repo() {
   local manifest_path="$1"
-  local comment_repo=""
   local version_value=""
   local version_repo=""
-
-  comment_repo="$(dev_kit_manifest_comment_repo_refs "$manifest_path" | head -n 1)"
-  if [ -n "$comment_repo" ]; then
-    printf '%s\n' "$comment_repo"
-    return 0
-  fi
 
   version_value="$(dev_kit_manifest_version_value "$manifest_path")"
   if [ -n "$version_value" ]; then
@@ -1069,7 +1062,7 @@ EOF
     if [ -n "$_manifests_yaml" ]; then
       dev_kit_context_section_comment_block "manifests"
       printf 'manifests:\n'
-      printf '%b\n' "$_manifests_yaml"
+      printf '%b' "$_manifests_yaml"
     fi
 
   } > "$context_path"

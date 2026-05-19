@@ -6,7 +6,7 @@ generator:
   tool: dev.kit
   repo: https://github.com/udx/dev.kit
   version: 0.11.0
-  generated_at: 2026-05-19T18:25:00Z
+  generated_at: 2026-05-19T18:52:32Z
 
 repo:
   name: dev.kit
@@ -148,7 +148,6 @@ manifests:
     kind: repoValidationConfig
     description: Public repo probes and validation defaults for dev.kit release checks
     declared_as: udx.dev/dev.kit/v1
-    source_repo: udx/worker
     used_by:
       - docs/real-repo-validation.md
       - lib/modules/config_catalog.sh
