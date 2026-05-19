@@ -16,7 +16,7 @@ DOCKER_ACTION_REPO="$TEST_HOME/docker-action-repo"
 EMPTY_REPO="$TEST_HOME/empty-repo"
 IGNORED_ACTION_REPO="$TEST_HOME/ignored-action-repo"
 WORKFLOW_CONTRACT_REPO="$TEST_HOME/workflow-contract-repo"
-AVAILABLE_TEST_GROUPS="core"
+AVAILABLE_TEST_GROUPS="core repo-contract"
 TEST_ONLY="${DEV_KIT_TEST_ONLY:-}"
 
 cleanup() {
@@ -26,10 +26,11 @@ trap cleanup EXIT
 
 usage() {
   cat <<'EOF'
-Usage: bash tests/suite.sh [--only core] [--list]
+Usage: bash tests/suite.sh [--only core|repo-contract|core,repo-contract] [--list]
 
 Groups:
-  core        command flow, output, and context generation checks
+  core           command flow, output, and context generation checks
+  repo-contract  focused generated-context contract regressions
 EOF
 }
 
@@ -49,6 +50,11 @@ should_run() {
     *,"$group",*) return 0 ;;
   esac
   return 1
+}
+
+should_run_explicit() {
+  [ -n "$TEST_ONLY" ] || return 1
+  should_run "$1"
 }
 
 replace_in_file() {
@@ -118,6 +124,37 @@ done <<EOF
 $(find "$REPO_DIR/lib/commands" -maxdepth 1 -type f -name '*.sh' | sort)
 EOF
 
+if should_run_explicit "repo-contract"; then
+  self_repo_json="$(cd "$REPO_DIR" && dev.kit repo --json)"
+  self_context_yaml="$(cat "$REPO_DIR/.rabbit/context.yaml")"
+  repo_validation_manifest="$(
+    awk '
+      /^  - path: src\/configs\/repo-validation.yaml$/ { flag = 1 }
+      flag && /^  - path:/ && $0 !~ /src\/configs\/repo-validation.yaml$/ { exit }
+      flag { print }
+    ' "$REPO_DIR/.rabbit/context.yaml"
+  )"
+
+  assert_not_contains "$self_repo_json" "\"repo\": \"udx/dev.kit\"" "repo contract: omits self dependency contracts"
+  assert_not_contains "$self_context_yaml" "source_repo: udx/dev.kit" "repo contract: omits self source repo provenance"
+  assert_not_contains "$repo_validation_manifest" "source_repo: udx/worker" "repo contract: does not treat probe repo values as manifest source repo"
+  assert_not_contains "$self_context_yaml" ".rabbit/dev.kit/" "repo contract: excludes generated rabbit evidence"
+
+  cp -R "$DOCKER_REPO" "$DOCKER_ACTION_REPO"
+  rm -f "$DOCKER_ACTION_REPO/.rabbit/context.yaml"
+
+  docker_repo_json="$(cd "$DOCKER_ACTION_REPO" && dev.kit repo --json)"
+  assert_contains "$docker_repo_json" "\"context\":" "repo contract: docker repo reports context path"
+
+  docker_context_yaml="${DOCKER_ACTION_REPO}/.rabbit/context.yaml"
+  assert_contains "$(cat "$docker_context_yaml")" "path: deploy.yml" "repo contract: includes deploy manifest"
+  assert_contains "$(cat "$docker_context_yaml")" "path: .rabbit/deploy.yml" "repo contract: includes hidden custom manifest"
+  assert_contains "$(cat "$docker_context_yaml")" "path: .rabbit/infra_configs/staging/k8s-configmap.yaml" "repo contract: inventories nested rabbit manifests"
+  docker_context_refs="$(awk '/^refs:/{flag=1;next} /^# Commands/{if(flag) exit} flag{print}' "$docker_context_yaml")"
+  assert_not_contains "$docker_context_refs" ".rabbit/infra_configs/staging/k8s-configmap.yaml" "repo contract: excludes nested rabbit manifests from read-first refs"
+  assert_contains "$(cat "$docker_context_yaml")" "source_repo: udx/worker" "repo contract: traces manifest owner from version"
+fi
+
 if should_run "core"; then
   guard_soft_output="$(
     DEV_KIT_SPINNER_DISABLE=1 \
@@ -165,9 +202,12 @@ if should_run "core"; then
   assert_contains "$home_json" "\"repo_detected\": true" "home: detects repo"
   assert_contains "$home_json" "\"synced\": {" "home: reports synced artifacts"
   assert_contains "$home_json" "\"context_status\": \"missing\"" "home: reports missing context"
+  assert_contains "$home_json" "\"workflow\": {" "home: reports workflow contract"
+  assert_contains "$home_json" "\"id\": \"env\"" "home: includes env job"
   assert_contains "$home_json" "\"helpers\": [" "home: reports helpers"
 
   home_text="$(cd "$HOME_ACTION_REPO" && dev.kit)"
+  assert_contains "$home_text" "[workflow]" "home text: renders workflow section"
   assert_contains "$home_text" "[required]" "home text: renders env tools"
   assert_contains "$home_text" "[context]" "home text: renders context section"
   assert_contains "$home_text" "Repo context is missing." "home text: guides missing context"
@@ -225,7 +265,7 @@ if should_run "core"; then
   assert_contains "$home_repeat_text" "[gaps]" "home text: summarizes gaps"
   assert_contains "$home_repeat_text" "[next]" "home text: summarizes next step"
   assert_contains "$home_repeat_text" "repair: README.md or .env.example" "home text: shows gap repair target"
-  assert_contains "$home_repeat_text" "reference: docs/references/config-contract-surfaces.md" "home text: shows gap reference"
+  assert_contains "$home_repeat_text" "reference: README.md" "home text: shows local gap reference"
   assert_contains "$home_repeat_text" "repair:            fix repo-owned gaps, then rerun dev.kit repo" "home text: prints repair loop next step"
 
   replace_in_file \
@@ -244,15 +284,19 @@ if should_run "core"; then
 
   env_json="$(cd "$HOME_ACTION_REPO" && dev.kit env --json)"
   assert_contains "$env_json" "\"command\": \"env\"" "env: reports command name"
+  assert_contains "$env_json" "\"workflow\": {" "env: reports workflow contract"
 
   repo_json="$(cd "$DOCUMENTED_SHELL_REPO" && dev.kit repo --json)"
   assert_contains "$repo_json" "\"archetype\":" "repo: reports archetype"
   assert_contains "$repo_json" "\"context\":" "repo: reports context path"
+  assert_contains "$repo_json" "\"context_status\": \"current\"" "repo: reports current workflow context after write"
   assert_contains "$repo_json" "\"repair_target\": \"README.md or .env.example\"" "repo: includes repair target"
-  assert_contains "$repo_json" "\"reference\": \"docs/references/config-contract-surfaces.md\"" "repo: includes reference doc"
+  assert_contains "$repo_json" "\"reference\": \"README.md\"" "repo: includes local reference doc"
   assert_contains "$repo_json" "\"id\": \"confirm-research-fix-loop\"" "repo: includes confirmation loop action"
+  assert_contains "$repo_json" "\"workflow\": {" "repo: reports workflow contract"
 
   repo_text="$(cd "$DOCUMENTED_SHELL_REPO" && dev.kit repo)"
+  assert_contains "$repo_text" "[workflow]" "repo text: renders workflow section"
   assert_contains "$repo_text" "[read first]" "repo text: renders read first section"
   assert_contains "$repo_text" "[factors]" "repo text: renders factors section"
   assert_contains "$repo_text" "[context]" "repo text: renders context section"
@@ -277,9 +321,18 @@ if should_run "core"; then
   assert_contains "$repo_write_failure_output" "boom" "repo text: preserves underlying write error"
 
   self_repo_json="$(cd "$REPO_DIR" && dev.kit repo --json)"
+  self_context_yaml="$(cat "$REPO_DIR/.rabbit/context.yaml")"
+  repo_validation_manifest="$(
+    awk '
+      /^  - path: src\/configs\/repo-validation.yaml$/ { flag = 1 }
+      flag && /^  - path:/ && $0 !~ /src\/configs\/repo-validation.yaml$/ { exit }
+      flag { print }
+    ' "$REPO_DIR/.rabbit/context.yaml"
+  )"
   assert_not_contains "$self_repo_json" "\"repo\": \"udx/dev.kit\"" "repo: omits self dependency contracts"
-  assert_not_contains "$(cat "$REPO_DIR/.rabbit/context.yaml")" "source_repo: udx/dev.kit" "repo: omits self source repo provenance"
-  assert_not_contains "$(cat "$REPO_DIR/.rabbit/context.yaml")" ".rabbit/dev.kit/" "repo: excludes generated rabbit evidence"
+  assert_not_contains "$self_context_yaml" "source_repo: udx/dev.kit" "repo: omits self source repo provenance"
+  assert_not_contains "$repo_validation_manifest" "source_repo: udx/worker" "repo: does not treat probe repo values as manifest source repo"
+  assert_not_contains "$self_context_yaml" ".rabbit/dev.kit/" "repo: excludes generated rabbit evidence"
 
   cp -R "$SIMPLE_REPO" "$SIMPLE_ACTION_REPO"
   rm -rf "$SIMPLE_ACTION_REPO/.dev-kit"
@@ -307,6 +360,9 @@ if should_run "core"; then
   assert_contains "$(cat "$docker_context_yaml")" "generator:" "docker repo: includes generator metadata"
   assert_contains "$(cat "$docker_context_yaml")" "path: deploy.yml" "docker repo: includes deploy manifest"
   assert_contains "$(cat "$docker_context_yaml")" "path: .rabbit/deploy.yml" "docker repo: includes hidden custom manifest"
+  assert_contains "$(cat "$docker_context_yaml")" "path: .rabbit/infra_configs/staging/k8s-configmap.yaml" "docker repo: inventories nested rabbit manifests"
+  docker_context_refs="$(awk '/^refs:/{flag=1;next} /^# Commands/{if(flag) exit} flag{print}' "$docker_context_yaml")"
+  assert_not_contains "$docker_context_refs" ".rabbit/infra_configs/staging/k8s-configmap.yaml" "docker repo: excludes nested rabbit manifests from read-first refs"
   assert_contains "$(cat "$docker_context_yaml")" "source_repo: udx/worker" "docker repo: traces manifest owner from version"
 
   mkdir -p "$IGNORED_ACTION_REPO/.next/cache"

@@ -20,6 +20,21 @@ Use **scripts and manifests** for programmatic execution:
 - deploy manifests such as `deploy.yml`
 - checked-in config examples when they are part of the runnable contract
 
+Use **structured refs** for deterministic parsing:
+
+- YAML and JSON manifests
+- package and tool config files
+- workflow references
+- version, kind, and description metadata
+- explicit command definitions
+
+Use **prose and session material** for interpreted intent:
+
+- Markdown docs and design notes
+- issue, PR, and review discussions
+- agent prompts and session summaries
+- manual decisions that are not encoded in scripts yet
+
 Use **`.rabbit/context.yaml`** for generated operational summary:
 
 - direct-read refs
@@ -37,6 +52,8 @@ That source asset may be a reference doc that later gets normalized into `AGENTS
 If a repo needs a compact generated summary for tooling or safe repo-scoped execution, put it in `.rabbit/context.yaml`.
 
 If a repo needs something to be executed safely by tools, keep that in a script or manifest rather than only in prose docs.
+
+When both structured and prose sources exist, `dev.kit` should parse the structured source first and use prose to explain intent, repair guidance, or open decisions. That keeps automation deterministic while still preserving the human and agent context behind the repo design.
 
 ## Repair loop
 

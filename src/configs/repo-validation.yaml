@@ -1,0 +1,29 @@
+kind: repoValidationConfig
+version: udx.dev/dev.kit/v1
+description: Public repo probes and validation defaults for dev.kit release checks
+
+config:
+  real_repo_probe:
+    default_mode: check
+    soft_timeout_seconds: 15
+    hard_timeout_seconds: 180
+  recommended_repos:
+    - https://github.com/udx/worker
+    - https://github.com/udx/reusable-workflows
+    - https://github.com/udx/github-rabbit-action
+  real_repo_probe_examples:
+    - udx/reusable-workflows
+    - udx/github-rabbit-action
+  real_repo_matrix:
+    worker:
+      repo: udx/worker
+      purpose: worker manifest and deployment contract sanity check
+    reusable_workflows:
+      repo: udx/reusable-workflows
+      purpose: reusable workflow contracts and docs-first workflow context
+    github_rabbit_action:
+      repo: udx/github-rabbit-action
+      purpose: action, docs, and workflow context mix
+    dev_kit:
+      repo: udx/dev.kit
+      purpose: self-hosting sanity check

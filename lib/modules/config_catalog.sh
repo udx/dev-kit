@@ -24,6 +24,18 @@ dev_kit_context_config_path() {
   dev_kit_config_path "src/configs/context-config.yaml"
 }
 
+dev_kit_repo_validation_config_path() {
+  dev_kit_config_path "src/configs/repo-validation.yaml"
+}
+
+dev_kit_repo_validation_list() {
+  dev_kit_yaml_config_list "$(dev_kit_repo_validation_config_path)" "$1"
+}
+
+dev_kit_repo_validation_scalar() {
+  dev_kit_yaml_mapping_scalar "$(dev_kit_repo_validation_config_path)" "$1" "$2"
+}
+
 dev_kit_context_list() {
   dev_kit_yaml_config_list "$(dev_kit_context_config_path)" "$1"
 }

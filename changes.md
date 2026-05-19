@@ -1,6 +1,10 @@
 # Changes
 
-### unreleased
+### 0.11.0
+
+- Expose repo-centric workflow status in `dev.kit`, `dev.kit env`, and `dev.kit repo` output so environment checks, context refresh, and gap repair appear as one repo-owned loop
+- Clarify the repo contract boundary between deterministic structured parsing and interpreted prose/session intent
+- Make real-repo validation read-only by default with guarded JSON reports, and move release probe values into repo-owned config
 
 ### 0.10.0
 

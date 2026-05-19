@@ -173,6 +173,7 @@ main() {
 
   find "$DEV_KIT_HOME/bin" -type f -exec chmod +x {} \;
   ln -sfn "$DEV_KIT_HOME/bin/dev-kit" "$target"
+  ln -sfn "$DEV_KIT_HOME/bin/dev-kit" "${DEV_KIT_BIN_DIR}/dev-kit"
 
   if command -v dev_kit_output_title >/dev/null 2>&1; then
     dev_kit_output_title "Installed dev.kit"

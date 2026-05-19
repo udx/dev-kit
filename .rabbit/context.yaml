@@ -5,8 +5,8 @@ version: udx.dev/dev.kit/v1
 generator:
   tool: dev.kit
   repo: https://github.com/udx/dev.kit
-  version: 0.10.0
-  generated_at: 2026-05-13T00:55:54Z
+  version: 0.11.0
+  generated_at: 2026-05-19T18:52:32Z
 
 repo:
   name: dev.kit
@@ -22,12 +22,14 @@ refs:
   - ./changes.md
   - ./Makefile
   - ./docs/references/command-surfaces.md
+  - ./docs/real-repo-validation.md
   - ./docs/references/repo-design.md
   - ./src/configs/archetypes.yaml
   - ./src/configs/audit-rules.yaml
   - ./src/configs/context-config.yaml
   - ./src/configs/detection-patterns.yaml
   - ./src/configs/detection-signals.yaml
+  - ./src/configs/repo-validation.yaml
   - ./deploy.yml
   - ./.github/workflows
   - ./docs
@@ -70,14 +72,16 @@ gaps:
 dependencies:
   - repo: udx/reusable-workflows
     kind: reusable workflow
-    resolved: false
+    resolved: true
+    archetype: workflow-repo
     used_by:
       - .github/workflows/context7-ops.yml
       - .github/workflows/npm-release-ops.yml
   - repo: udx/worker
     kind: manifest contract (deploy)
-    resolved: false
+    resolved: true
     declared_as: udx.io/worker-v1/deploy
+    archetype: manifest-repo
     used_by:
       - deploy.yml
 
@@ -140,6 +144,22 @@ manifests:
       - version: udx.dev/dev.kit/v1
       - path reference: lib/modules/repo_signals.sh
       - path reference: tests/suite.sh
+  - path: src/configs/repo-validation.yaml
+    kind: repoValidationConfig
+    description: Public repo probes and validation defaults for dev.kit release checks
+    declared_as: udx.dev/dev.kit/v1
+    used_by:
+      - docs/real-repo-validation.md
+      - lib/modules/config_catalog.sh
+      - tests/real-repos.sh
+    evidence:
+      - version: udx.dev/dev.kit/v1
+      - github reference: udx/worker
+      - github reference: udx/reusable-workflows
+      - github reference: udx/github-rabbit-action
+      - path reference: docs/real-repo-validation.md
+      - path reference: lib/modules/config_catalog.sh
+      - path reference: tests/real-repos.sh
   - path: deploy.yml
     kind: workerDeployConfig
     declared_as: udx.io/worker-v1/deploy
@@ -163,4 +183,3 @@ manifests:
       - path reference: src/configs/context-config.yaml
       - path reference: src/configs/detection-signals.yaml
       - path reference: tests/suite.sh
-
