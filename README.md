@@ -181,6 +181,7 @@ All commands support `--json`.
 - [Environment Config](docs/environment-config.md)
 - [Context Coverage](docs/context-coverage.md)
 - [Integration](docs/integration.md)
+- [Real Repo Validation](docs/real-repo-validation.md)
 - [Smart Dependency Detection](docs/smart-dependency-detection.md)
 - [Reference Docs](docs/references/README.md)
 - [Reference: Command and Workflow Surfaces](docs/references/command-surfaces.md)
@@ -199,5 +200,5 @@ bash tests/worker-smoke.sh
 ```
 
 ```bash
-bash tests/real-repos.sh /path/to/repo1 /path/to/repo2
+bash tests/real-repos.sh --check /path/to/repo1 /path/to/repo2
 ```

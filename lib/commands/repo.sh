@@ -3,11 +3,7 @@
 # @description: Analyze repo structure and factors
 
 dev_kit_repo_recommended_repos_text() {
-  cat <<'EOF'
-https://github.com/udx/worker
-https://github.com/udx/reusable-workflows
-https://github.com/udx/github-rabbit-action
-EOF
+  dev_kit_repo_validation_list "recommended_repos"
 }
 
 dev_kit_repo_recommended_repos_json() {

@@ -1,0 +1,25 @@
+kind: repoValidationConfig
+version: udx.dev/dev.kit/v1
+description: Public repo probes and validation defaults for dev.kit release checks
+
+config:
+  recommended_repos:
+    - https://github.com/udx/worker
+    - https://github.com/udx/reusable-workflows
+    - https://github.com/udx/github-rabbit-action
+  real_repo_probe_examples:
+    - udx/reusable-workflows
+    - udx/github-rabbit-action
+  real_repo_matrix:
+    site_enc_apps:
+      repo: udx/site-enc-apps
+      purpose: many .rabbit/infra_configs environment definitions; validates manifest coverage without flooding first-read refs
+    gh_workflows:
+      repo: udx/gh-workflows
+      purpose: workflow-heavy repo; validates pipeline and reusable workflow context
+    rabbit_automation_action:
+      repo: udx/rabbit-automation-action
+      purpose: action, container, docs, and workflow mix
+    dev_kit:
+      repo: udx/dev.kit
+      purpose: self-hosting sanity check
