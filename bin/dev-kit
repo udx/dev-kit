@@ -309,6 +309,94 @@ dev_kit_home_context_reason() {
   fi
 }
 
+dev_kit_home_repo_workflow_status() {
+  local repo_root="$1"
+  local context_status="$2"
+  local context_yaml_path="$3"
+  local gap_count=0
+
+  [ -n "$repo_root" ] || {
+    printf '%s' "unavailable"
+    return 0
+  }
+
+  case "$context_status" in
+    missing)
+      printf '%s' "needs_repo_context"
+      return 0
+      ;;
+    stale)
+      printf '%s' "stale_context"
+      return 0
+      ;;
+  esac
+
+  if [ -n "$context_yaml_path" ] && [ -f "$context_yaml_path" ]; then
+    gap_count="$(dev_kit_context_section_item_count "$context_yaml_path" "gaps" '^  - factor:')"
+  else
+    gap_count="$(dev_kit_repo_gap_count "$repo_root")"
+  fi
+
+  if [ "${gap_count:-0}" -gt 0 ]; then
+    printf '%s' "needs_repair"
+    return 0
+  fi
+
+  printf '%s' "ready"
+}
+
+dev_kit_home_workflow_status() {
+  local repo_detected="$1"
+  local env_status="$2"
+  local repo_status="$3"
+
+  if [ "$env_status" = "blocked" ]; then
+    printf '%s' "blocked"
+    return 0
+  fi
+
+  if [ "$repo_detected" != "true" ]; then
+    printf '%s' "workspace_only"
+    return 0
+  fi
+
+  case "$repo_status" in
+    needs_repo_context|stale_context)
+      printf '%s' "needs_repo_context"
+      ;;
+    needs_repair)
+      printf '%s' "needs_repair"
+      ;;
+    *)
+      printf '%s' "ready"
+      ;;
+  esac
+}
+
+dev_kit_home_workflow_json() {
+  local repo_detected="$1"
+  local repo_root="$2"
+  local context_status="$3"
+  local context_yaml_path="$4"
+  local env_status=""
+  local repo_status=""
+  local workflow_status=""
+  local jobs_json=""
+
+  env_status="$(dev_kit_env_workflow_status)"
+  repo_status="$(dev_kit_home_repo_workflow_status "$repo_root" "$context_status" "$context_yaml_path")"
+  workflow_status="$(dev_kit_home_workflow_status "$repo_detected" "$env_status" "$repo_status")"
+  jobs_json="$(dev_kit_env_workflow_job_json)"
+
+  if [ "$repo_detected" = "true" ]; then
+    jobs_json="${jobs_json}, $(dev_kit_repo_workflow_job_json "$repo_root" "$repo_status" "write" "$context_status")"
+  fi
+
+  printf '{ "id": "dev-kit", "label": "Normalize repo and environment", "status": "%s", "jobs": [%s] }' \
+    "$(dev_kit_json_escape "$workflow_status")" \
+    "$jobs_json"
+}
+
 dev_kit_run_home() {
   local format="${1:-text}"
   local state="installed"
@@ -319,6 +407,9 @@ dev_kit_run_home() {
   local context_yaml_path=""
   local context_status="none"
   local context_reason=""
+  local env_workflow_status=""
+  local repo_workflow_status=""
+  local workflow_status=""
 
   repo_root="$(dev_kit_repo_root "$repo_dir")"
   if [ -n "$repo_root" ]; then
@@ -344,11 +435,16 @@ dev_kit_run_home() {
     fi
   fi
 
+  env_workflow_status="$(dev_kit_env_workflow_status)"
+  repo_workflow_status="$(dev_kit_home_repo_workflow_status "$repo_root" "$context_status" "$context_yaml_path")"
+  workflow_status="$(dev_kit_home_workflow_status "$repo_detected" "$env_workflow_status" "$repo_workflow_status")"
+
   if [ "$format" = "json" ]; then
     printf '{\n'
     printf '  "name": "dev.kit",\n'
     printf '  "home": "%s",\n' "$(dev_kit_json_escape "$DEV_KIT_HOME")"
     printf '  "state": "%s",\n' "$(dev_kit_json_escape "$state")"
+    printf '  "workflow": %s,\n' "$(dev_kit_home_workflow_json "$repo_detected" "$repo_root" "$context_status" "$context_yaml_path")"
     printf '  "workspace": {\n'
     printf '    "path": "%s",\n' "$(dev_kit_json_escape "$repo_dir")"
     printf '    "repo_detected": %s,\n' "$repo_detected"
@@ -392,6 +488,13 @@ dev_kit_run_home() {
   # Text mode: print title immediately, then compute and print progressively
   dev_kit_output_title "dev.kit"
 
+  dev_kit_output_section "workflow"
+  dev_kit_output_row "status" "$workflow_status"
+  dev_kit_output_row "env" "$env_workflow_status"
+  if [ "$repo_detected" = "true" ]; then
+    dev_kit_output_row "repo" "$repo_workflow_status"
+  fi
+
   # ── Environment: list tools by category with what they enable ───────────────
   local _env_line _env_cat _env_val _prev_cat=""
   while IFS= read -r _env_line; do
@@ -422,7 +525,6 @@ EOF
     context_yaml_path="$(dev_kit_context_yaml_path "$repo_root")"
 
     dev_kit_output_summary "${summary_name} • ${summary_archetype}"
-
     dev_kit_output_section "context"
     dev_kit_output_row "path" "$context_yaml_path"
     dev_kit_output_row "status" "$context_status"

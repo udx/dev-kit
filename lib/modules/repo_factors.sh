@@ -636,14 +636,136 @@ dev_kit_repo_factor_repair_target() {
   [ -n "$first_doc" ] && printf '%s' "$first_doc"
 }
 
+dev_kit_repo_prefers_internal_references() {
+  local repo_dir="$1"
+  local repo_name=""
+  local repo_slug=""
+  local real_repo_dir=""
+
+  repo_name="$(dev_kit_repo_name "$repo_dir" 2>/dev/null || true)"
+  repo_slug="$(dev_kit_repo_current_slug "$repo_dir" "$repo_name" 2>/dev/null || true)"
+  real_repo_dir="$(cd "$repo_dir" 2>/dev/null && pwd)"
+
+  [ "$real_repo_dir" = "$REPO_DIR" ] || { [ "$repo_slug" = "udx/dev.kit" ] && [ "$repo_name" = "dev.kit" ]; }
+}
+
+dev_kit_repo_reference_doc_default() {
+  local repo_dir="$1"
+  local first_doc=""
+
+  first_doc="$(dev_kit_repo_first_existing_signal "$repo_dir" "documentation_files" 2>/dev/null || true)"
+  if [ -n "$first_doc" ]; then
+    printf '%s' "$first_doc"
+    return 0
+  fi
+
+  if dev_kit_repo_has_dir "$repo_dir" "docs"; then
+    printf '%s' "docs/"
+    return 0
+  fi
+
+  printf '%s' "README.md"
+}
+
+dev_kit_repo_dependency_reference_local() {
+  local repo_dir="$1"
+  local first_manifest=""
+  local first_workflow=""
+
+  first_manifest="$(dev_kit_repo_contract_manifest_files "$repo_dir" | awk 'NF { print; exit }')"
+  if [ -n "$first_manifest" ]; then
+    printf '%s' "$first_manifest"
+    return 0
+  fi
+
+  first_workflow="$(dev_kit_repo_first_existing_signal "$repo_dir" "workflow_primary_files" 2>/dev/null || true)"
+  if [ -n "$first_workflow" ]; then
+    printf '%s' "$first_workflow"
+    return 0
+  fi
+
+  if dev_kit_has_file "$repo_dir" "deploy.yml"; then
+    printf '%s' "deploy.yml"
+    return 0
+  fi
+
+  dev_kit_repo_reference_doc_default "$repo_dir"
+}
+
+dev_kit_repo_config_reference_local() {
+  local repo_dir="$1"
+  local runtime_config=""
+  local config_doc=""
+
+  config_doc="$(dev_kit_repo_documented_env_var_sources "$repo_dir" | awk 'NF { print; exit }')"
+  if [ -n "$config_doc" ]; then
+    printf '%s' "$config_doc"
+    return 0
+  fi
+
+  runtime_config="$(dev_kit_repo_first_existing_signal "$repo_dir" "config_runtime_files" 2>/dev/null || true)"
+  if [ -n "$runtime_config" ]; then
+    printf '%s' "$runtime_config"
+    return 0
+  fi
+
+  if dev_kit_has_file "$repo_dir" ".env.example"; then
+    printf '%s' ".env.example"
+    return 0
+  fi
+
+  dev_kit_repo_reference_doc_default "$repo_dir"
+}
+
+dev_kit_repo_pipeline_reference_local() {
+  local repo_dir="$1"
+  local verify_source=""
+  local first_workflow=""
+
+  verify_source="$(dev_kit_repo_command_detection_result "$repo_dir" "verification" 2>/dev/null | cut -d'|' -f3)"
+  if [ -n "$verify_source" ]; then
+    printf '%s' "$verify_source"
+    return 0
+  fi
+
+  first_workflow="$(dev_kit_repo_first_existing_signal "$repo_dir" "workflow_primary_files" 2>/dev/null || true)"
+  if [ -n "$first_workflow" ]; then
+    printf '%s' "$first_workflow"
+    return 0
+  fi
+
+  if dev_kit_has_file "$repo_dir" "deploy.yml"; then
+    printf '%s' "deploy.yml"
+    return 0
+  fi
+
+  dev_kit_repo_reference_doc_default "$repo_dir"
+}
+
 dev_kit_repo_factor_reference() {
+  local repo_dir=""
   local factor="$1"
   local status="$2"
-  local maybe_status="$3"
 
-  if [ -n "${maybe_status:-}" ]; then
+  if [ "$#" -ge 3 ]; then
+    repo_dir="$1"
     factor="$2"
     status="$3"
+  fi
+
+  if [ -n "$repo_dir" ] && ! dev_kit_repo_prefers_internal_references "$repo_dir"; then
+    case "${factor}:${status}" in
+      dependencies:partial|dependencies:missing)
+        dev_kit_repo_dependency_reference_local "$repo_dir"
+        ;;
+      config:partial|config:missing)
+        dev_kit_repo_config_reference_local "$repo_dir"
+        ;;
+      pipeline:partial|pipeline:missing)
+        dev_kit_repo_pipeline_reference_local "$repo_dir"
+        ;;
+    esac
+    return 0
   fi
 
   case "${factor}:${status}" in

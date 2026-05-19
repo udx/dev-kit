@@ -2,6 +2,9 @@
 
 ### unreleased
 
+- Expose repo-centric workflow status in `dev.kit`, `dev.kit env`, and `dev.kit repo` output so environment checks, context refresh, and gap repair appear as one repo-owned loop
+- Clarify the repo contract boundary between deterministic structured parsing and interpreted prose/session intent
+
 ### 0.10.0
 
 - Remove `dev.kit agent` so `.rabbit/context.yaml` is the single generated repo contract

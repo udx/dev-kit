@@ -9,6 +9,7 @@
   "factors": {{factors}},
   "gaps": {{gaps}},
   "actions": {{actions}},
+  "workflow": {{workflow}},
   "context": "{{context}}",
   "dependencies": {{dependencies}},
   "recommended_repos": {{recommended_repos}}

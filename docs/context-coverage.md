@@ -14,6 +14,8 @@ It should answer three questions:
 
 For the boundary between generated contract data and durable repo docs, see [Repo Contract Boundary](repo-contract-boundary.md).
 
+Structured sources such as YAML, JSON, workflow refs, and manifest metadata should be parsed programmatically where possible. Prose sources such as Markdown docs, prompts, reviews, and session notes should be treated as interpreted intent unless they point to a concrete script, manifest, or command.
+
 Typical sections include:
 
 - generator metadata

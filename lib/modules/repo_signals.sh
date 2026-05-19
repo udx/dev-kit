@@ -539,6 +539,9 @@ dev_kit_repo_contract_manifest_refs() {
   while IFS= read -r manifest_rel; do
     [ -n "$manifest_rel" ] || continue
     case "$manifest_rel" in
+      .rabbit/*/*)
+        continue
+        ;;
       .rabbit/*.yml|.rabbit/*.yaml|*.yml|*.yaml)
         printf './%s\n' "$manifest_rel"
         ;;

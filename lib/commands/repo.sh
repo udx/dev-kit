@@ -45,6 +45,8 @@ dev_kit_cmd_repo() {
   local actions_json=""
   local context_yaml_path=""
   local gap_lines=""
+  local workflow_status=""
+  local workflow_context_status=""
 
   local force_resolve=0
   local repo_soft_timeout="${DEV_KIT_REPO_SOFT_TIMEOUT:-15}"
@@ -76,12 +78,18 @@ dev_kit_cmd_repo() {
   local gap_count
   gap_count="$(printf '%s\n' "$gaps_json" | grep -c '"factor"' 2>/dev/null || true)"
   gap_count="${gap_count:-0}"
+  workflow_status="$(dev_kit_repo_workflow_status "$repo_dir" "$gap_count")"
   actions_json="$(dev_kit_repo_actions_json "$gap_count")"
 
   # JSON mode: compute everything up front then emit template
   if [ "$format" = "json" ]; then
     if [ "$mode" = "write" ]; then
       dev_kit_context_yaml_write "$repo_dir" "$force_resolve" >/dev/null
+      workflow_context_status="current"
+    elif [ -f "$context_yaml_path" ]; then
+      workflow_context_status="existing"
+    else
+      workflow_context_status="missing"
     fi
     dev_kit_template_render "repo.json" \
       "command=repo" \
@@ -93,6 +101,7 @@ dev_kit_cmd_repo() {
       "factors=$(dev_kit_repo_factor_summary_json "$repo_dir")" \
       "gaps=$gaps_json" \
       "actions=$actions_json" \
+      "workflow={ \"id\": \"dev-kit\", \"label\": \"Normalize repo and environment\", \"jobs\": [$(dev_kit_repo_workflow_job_json "$repo_dir" "$workflow_status" "$mode" "$workflow_context_status" "$gap_count")] }" \
       "context=$(dev_kit_json_escape "$context_yaml_path")" \
       "dependencies=$(dev_kit_deps_json "$repo_dir")" \
       "recommended_repos=$(dev_kit_repo_recommended_repos_json)"
@@ -108,6 +117,13 @@ dev_kit_cmd_repo() {
   dev_kit_spinner_stop ""
 
   dev_kit_output_summary "${repo_name} • ${archetype} • mode: ${mode}"
+
+  dev_kit_output_section "workflow"
+  dev_kit_output_row "job" "repo"
+  dev_kit_output_row "status" "$workflow_status"
+  dev_kit_output_list_from_lines <<EOF
+$(dev_kit_repo_workflow_step_summaries "$repo_dir")
+EOF
 
   # ── Priority refs — what to read first ─────────────────────────────────────
   local priority_refs first_ref second_ref

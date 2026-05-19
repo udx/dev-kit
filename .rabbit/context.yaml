@@ -6,7 +6,7 @@ generator:
   tool: dev.kit
   repo: https://github.com/udx/dev.kit
   version: 0.10.0
-  generated_at: 2026-05-13T00:55:54Z
+  generated_at: 2026-05-19T17:49:21Z
 
 repo:
   name: dev.kit
@@ -70,14 +70,16 @@ gaps:
 dependencies:
   - repo: udx/reusable-workflows
     kind: reusable workflow
-    resolved: false
+    resolved: true
+    archetype: workflow-repo
     used_by:
       - .github/workflows/context7-ops.yml
       - .github/workflows/npm-release-ops.yml
   - repo: udx/worker
     kind: manifest contract (deploy)
-    resolved: false
+    resolved: true
     declared_as: udx.io/worker-v1/deploy
+    archetype: manifest-repo
     used_by:
       - deploy.yml
 
@@ -163,4 +165,3 @@ manifests:
       - path reference: src/configs/context-config.yaml
       - path reference: src/configs/detection-signals.yaml
       - path reference: tests/suite.sh
-
