@@ -99,7 +99,13 @@ require_jq() {
 }
 
 report_name_for_repo() {
-  basename "$1" | tr -c 'A-Za-z0-9._-' '-'
+  local repo_path="$1"
+  local safe_path=""
+  local path_hash=""
+
+  safe_path="$(printf '%s' "$repo_path" | tr -c 'A-Za-z0-9._-' '-')"
+  path_hash="$(printf '%s' "$repo_path" | cksum | awk '{ print $1 }')"
+  printf '%s-%s' "$safe_path" "$path_hash"
 }
 
 print_check_summary() {

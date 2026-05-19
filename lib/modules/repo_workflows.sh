@@ -28,12 +28,23 @@ dev_kit_repo_entrypoint_source() {
 
 dev_kit_repo_gap_count() {
   local repo_dir="$1"
+  local factor=""
+  local status=""
+  local gap_count=0
 
-  dev_kit_repo_factor_summary_json "$repo_dir" | jq -r '
-    to_entries
-    | map(select(.value.status == "missing" or .value.status == "partial"))
-    | length
-  ' 2>/dev/null || printf '0'
+  while IFS= read -r factor; do
+    [ -n "$factor" ] || continue
+    status="$(dev_kit_repo_factor_status "$repo_dir" "$factor")"
+    case "$status" in
+      missing|partial)
+        gap_count=$((gap_count + 1))
+        ;;
+    esac
+  done <<EOF
+$(dev_kit_repo_factor_ids)
+EOF
+
+  printf '%s' "$gap_count"
 }
 
 dev_kit_repo_workflow_status() {
