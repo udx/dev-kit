@@ -26,7 +26,7 @@ trap cleanup EXIT
 
 usage() {
   cat <<'EOF'
-Usage: bash tests/suite.sh [--only core|repo-contract] [--list]
+Usage: bash tests/suite.sh [--only core|repo-contract|core,repo-contract] [--list]
 
 Groups:
   core           command flow, output, and context generation checks

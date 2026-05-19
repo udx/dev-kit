@@ -644,7 +644,7 @@ dev_kit_repo_prefers_internal_references() {
 
   repo_name="$(dev_kit_repo_name "$repo_dir" 2>/dev/null || true)"
   repo_slug="$(dev_kit_repo_current_slug "$repo_dir" "$repo_name" 2>/dev/null || true)"
-  real_repo_dir="$(cd "$repo_dir" 2>/dev/null && pwd)"
+  real_repo_dir="$(cd "$repo_dir" 2>/dev/null && pwd || true)"
 
   [ "$real_repo_dir" = "$REPO_DIR" ] || { [ "$repo_slug" = "udx/dev.kit" ] && [ "$repo_name" = "dev.kit" ]; }
 }
