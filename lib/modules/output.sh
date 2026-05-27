@@ -167,6 +167,19 @@ EOF
   kill "-${signal}" "$root_pid" 2>/dev/null || true
 }
 
+dev_kit_process_signal_list() {
+  local signal="$1"
+  local pid_list="$2"
+  local target_pid=""
+
+  while IFS= read -r target_pid; do
+    [ -n "$target_pid" ] || continue
+    kill "-${signal}" "$target_pid" 2>/dev/null || true
+  done <<EOF
+$pid_list
+EOF
+}
+
 dev_kit_run_guarded() {
   local label="$1"
   local soft_timeout="${2:-$DEV_KIT_PROGRESS_SOFT_TIMEOUT}"
@@ -176,21 +189,31 @@ dev_kit_run_guarded() {
 
   local stdout_file=""
   local stderr_file=""
+  local pgid_file=""
   local pid=""
+  local guarded_pgid=""
   local started_at=""
   local now=""
   local elapsed=0
   local soft_announced=0
   local status=0
+  local timeout_pids=""
 
   stdout_file="$(mktemp "${TMPDIR:-/tmp}/dev-kit-guard-out.XXXXXX")" || return 1
   stderr_file="$(mktemp "${TMPDIR:-/tmp}/dev-kit-guard-err.XXXXXX")" || {
     rm -f "$stdout_file"
     return 1
   }
+  pgid_file="$(mktemp "${TMPDIR:-/tmp}/dev-kit-guard-pgid.XXXXXX")" || {
+    rm -f "$stdout_file" "$stderr_file"
+    return 1
+  }
 
   (
-    "$@"
+    set -m 2>/dev/null || true
+    "$@" &
+    printf '%s\n' "$!" > "$pgid_file"
+    wait "$!"
   ) >"$stdout_file" 2>"$stderr_file" &
   pid=$!
   started_at="$(date +%s)"
@@ -208,18 +231,25 @@ dev_kit_run_guarded() {
     fi
 
     if [ "$hard_timeout" -gt 0 ] && [ "$elapsed" -ge "$hard_timeout" ]; then
-      dev_kit_process_signal_tree TERM "$pid"
-      sleep 2
-      if kill -0 "$pid" 2>/dev/null; then
-        dev_kit_process_signal_tree KILL "$pid"
+      guarded_pgid="$(cat "$pgid_file" 2>/dev/null || true)"
+      timeout_pids="$(dev_kit_process_descendants "$pid")
+$pid"
+      if [ -n "$guarded_pgid" ]; then
+        kill -TERM "-${guarded_pgid}" 2>/dev/null || true
       fi
+      dev_kit_process_signal_list TERM "$timeout_pids"
+      sleep 1
+      if [ -n "$guarded_pgid" ]; then
+        kill -KILL "-${guarded_pgid}" 2>/dev/null || true
+      fi
+      dev_kit_process_signal_list KILL "$timeout_pids"
       wait "$pid" 2>/dev/null || true
       dev_kit_spinner_stop ""
       [ -s "$stdout_file" ] && cat "$stdout_file"
       [ -s "$stderr_file" ] && cat "$stderr_file" >&2
       printf 'dev.kit timeout: %s exceeded %ss and was stopped to prevent an endless run.\n' \
         "$label" "$hard_timeout" >&2
-      rm -f "$stdout_file" "$stderr_file"
+      rm -f "$stdout_file" "$stderr_file" "$pgid_file"
       return 124
     fi
   done
@@ -230,7 +260,7 @@ dev_kit_run_guarded() {
 
   [ -s "$stdout_file" ] && cat "$stdout_file"
   [ -s "$stderr_file" ] && cat "$stderr_file" >&2
-  rm -f "$stdout_file" "$stderr_file"
+  rm -f "$stdout_file" "$stderr_file" "$pgid_file"
   return "$status"
 }
 

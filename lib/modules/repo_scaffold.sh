@@ -179,7 +179,7 @@ dev_kit_repo_is_contract_evidence_path() {
   local path="$1"
 
   case "$path" in
-    ""|.git/*|.rabbit/context.yaml|.rabbit/dev.kit/*|AGENTS.md|.udx/*|.claude/*|.copilot/*|.cursor/*)
+    ""|.git/*|.rabbit/context.yaml|.rabbit/context.yaml.tmp.*|.rabbit/dev.kit/*|AGENTS.md|.udx/*|.claude/*|.copilot/*|.cursor/*)
       return 1
       ;;
   esac
@@ -486,6 +486,25 @@ dev_kit_context_yaml_path() {
   printf '%s/.rabbit/context.yaml\n' "$repo_root"
 }
 
+dev_kit_context_yaml_local_path_matches() {
+  local context_path="$1"
+
+  [ -f "$context_path" ] || return 0
+
+  grep -En '(/Users/|/private/|file://|/home/[^[:space:]]+|/var/folders|/tmp/)' "$context_path" 2>/dev/null || true
+}
+
+dev_kit_context_yaml_validate_portable() {
+  local context_path="$1"
+  local matches=""
+
+  matches="$(dev_kit_context_yaml_local_path_matches "$context_path")"
+  if [ -n "$matches" ]; then
+    printf 'Generated context contains machine-local absolute paths:\n%s\n' "$matches" >&2
+    return 1
+  fi
+}
+
 # Report gaps as JSON array [{factor, status, message}]
 # Reads from existing factor analysis — no new detection here
 dev_kit_scaffold_gaps_json() {
@@ -692,7 +711,9 @@ dev_kit_context_yaml_write() {
   local repo_root="$1"
   local force="${2:-0}"
   local context_path="${repo_root}/.rabbit/context.yaml"
+  local tmp_context_path=""
   dev_kit_repo_ensure_default_structure "$repo_root"
+  tmp_context_path="$(mktemp "${context_path}.tmp.XXXXXX")"
 
   local _repo _arch _arch_desc
   _repo="$(dev_kit_repo_name "$repo_root")"
@@ -708,7 +729,12 @@ dev_kit_context_yaml_write() {
     printf '  tool: dev.kit\n'
     printf '  repo: https://github.com/udx/dev.kit\n'
     printf '  version: %s\n' "$(dev_kit_tool_version)"
-    printf '  generated_at: %s\n\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    printf '  generated_at: %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+    printf '  sources:\n'
+    printf '    homepage: https://udx.dev/kit\n'
+    printf '    repository: https://github.com/udx/dev.kit\n'
+    printf '    package: https://www.npmjs.com/package/@udx/dev-kit\n'
+    printf '    installation: https://github.com/udx/dev.kit/blob/latest/docs/installation.md\n\n'
 
     printf 'repo:\n'
     printf '  name: %s\n'      "$_repo"
@@ -1065,7 +1091,14 @@ EOF
       printf '%b' "$_manifests_yaml"
     fi
 
-  } > "$context_path"
+  } > "$tmp_context_path"
+
+  if ! dev_kit_context_yaml_validate_portable "$tmp_context_path"; then
+    rm -f "$tmp_context_path"
+    return 1
+  fi
+
+  mv "$tmp_context_path" "$context_path"
 
   printf "%s" "$context_path"
 }

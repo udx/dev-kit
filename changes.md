@@ -1,5 +1,12 @@
 # Changes
 
+### 0.12.0
+
+- Add generator source refs to `.rabbit/context.yaml` so generated context points to the dev.kit homepage, source repo, npm package, and installation guide.
+- Validate generated context portability before writing it, rejecting machine-local absolute paths and excluding temporary context files from repo evidence.
+- Add repo-owned context contract and output schema docs to clarify what dev.kit reads, emits, and must not own.
+- Harden guarded command timeouts so child processes are cleaned up by process group without disabling timeout protection.
+
 ### 0.11.0
 
 - Expose repo-centric workflow status in `dev.kit`, `dev.kit env`, and `dev.kit repo` output so environment checks, context refresh, and gap repair appear as one repo-owned loop
