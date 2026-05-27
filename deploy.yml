@@ -11,4 +11,3 @@ config:
   command: "/bin/bash"
   args:
     - "/workspace/tests/suite.sh"
-

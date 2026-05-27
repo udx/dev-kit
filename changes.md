@@ -1,5 +1,9 @@
 # Changes
 
+### 0.13.0
+
+- Allow repo-owned manifests to satisfy config contract coverage when they declare explicit config contract metadata or runtime config sections, avoiding forced `.env.example` files for repos with custom manifest contracts.
+
 ### 0.12.0
 
 - Add generator source refs to `.rabbit/context.yaml` so generated context points to the dev.kit homepage, source repo, npm package, and installation guide.
