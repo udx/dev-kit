@@ -5,8 +5,13 @@ version: udx.dev/dev.kit/v1
 generator:
   tool: dev.kit
   repo: https://github.com/udx/dev.kit
-  version: 0.11.0
-  generated_at: 2026-05-19T18:52:32Z
+  version: 0.12.0
+  generated_at: 2026-05-27T09:28:30Z
+  sources:
+    homepage: https://udx.dev/kit
+    repository: https://github.com/udx/dev.kit
+    package: https://www.npmjs.com/package/@udx/dev-kit
+    installation: https://github.com/udx/dev.kit/blob/latest/docs/installation.md
 
 repo:
   name: dev.kit
@@ -23,6 +28,7 @@ refs:
   - ./Makefile
   - ./docs/references/command-surfaces.md
   - ./docs/real-repo-validation.md
+  - ./docs/references/output-schemas.md
   - ./docs/references/repo-design.md
   - ./src/configs/archetypes.yaml
   - ./src/configs/audit-rules.yaml
@@ -166,6 +172,7 @@ manifests:
     source_repo: udx/worker
     used_by:
       - Makefile
+      - docs/context-contract.md
       - docs/references/command-surfaces.md
       - docs/references/config-contract-surfaces.md
       - docs/repo-contract-boundary.md
@@ -176,6 +183,7 @@ manifests:
     evidence:
       - version: udx.io/worker-v1/deploy
       - path reference: Makefile
+      - path reference: docs/context-contract.md
       - path reference: docs/references/command-surfaces.md
       - path reference: docs/references/config-contract-surfaces.md
       - path reference: docs/repo-contract-boundary.md

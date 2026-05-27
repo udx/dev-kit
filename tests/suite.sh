@@ -139,6 +139,7 @@ if should_run_explicit "repo-contract"; then
   assert_not_contains "$self_context_yaml" "source_repo: udx/dev.kit" "repo contract: omits self source repo provenance"
   assert_not_contains "$repo_validation_manifest" "source_repo: udx/worker" "repo contract: does not treat probe repo values as manifest source repo"
   assert_not_contains "$self_context_yaml" ".rabbit/dev.kit/" "repo contract: excludes generated rabbit evidence"
+  assert_not_contains "$self_context_yaml" ".rabbit/context.yaml.tmp." "repo contract: excludes context temp files from evidence"
 
   cp -R "$DOCKER_REPO" "$DOCKER_ACTION_REPO"
   rm -f "$DOCKER_ACTION_REPO/.rabbit/context.yaml"
@@ -333,6 +334,7 @@ if should_run "core"; then
   assert_not_contains "$self_context_yaml" "source_repo: udx/dev.kit" "repo: omits self source repo provenance"
   assert_not_contains "$repo_validation_manifest" "source_repo: udx/worker" "repo: does not treat probe repo values as manifest source repo"
   assert_not_contains "$self_context_yaml" ".rabbit/dev.kit/" "repo: excludes generated rabbit evidence"
+  assert_not_contains "$self_context_yaml" ".rabbit/context.yaml.tmp." "repo: excludes context temp files from evidence"
 
   cp -R "$SIMPLE_REPO" "$SIMPLE_ACTION_REPO"
   rm -rf "$SIMPLE_ACTION_REPO/.dev-kit"
@@ -346,8 +348,15 @@ if should_run "core"; then
   assert_contains "$(cat "$context_yaml")" "kind: repoContext" "repo: context.yaml has kind header"
   assert_contains "$(cat "$context_yaml")" "generator:" "repo: context.yaml has generator metadata"
   assert_contains "$(cat "$context_yaml")" "tool: dev.kit" "repo: context.yaml records generator tool"
+  assert_contains "$(cat "$context_yaml")" "repo: https://github.com/udx/dev.kit" "repo: context.yaml records generator repo"
+  assert_contains "$(cat "$context_yaml")" "sources:" "repo: context.yaml records generator source refs"
+  assert_contains "$(cat "$context_yaml")" "homepage: https://udx.dev/kit" "repo: context.yaml records dev.kit homepage"
+  assert_contains "$(cat "$context_yaml")" "package: https://www.npmjs.com/package/@udx/dev-kit" "repo: context.yaml records package source"
+  assert_contains "$(cat "$context_yaml")" "installation: https://github.com/udx/dev.kit/blob/latest/docs/installation.md" "repo: context.yaml records installation guide"
   assert_contains "$(cat "$context_yaml")" "generated_at:" "repo: context.yaml records generated timestamp"
   assert_not_contains "$(cat "$context_yaml")" "/Users/" "repo: context.yaml has no absolute paths"
+  assert_not_contains "$(cat "$context_yaml")" "/private/" "repo: context.yaml has no private temp paths"
+  assert_not_contains "$(cat "$context_yaml")" "file://" "repo: context.yaml has no file URI paths"
   assert_not_contains "$(cat "$context_yaml")" "kind: npm package" "repo: context.yaml omits package inventory"
 
   cp -R "$DOCKER_REPO" "$DOCKER_ACTION_REPO"
