@@ -79,6 +79,27 @@ replace_in_file() {
   ' "$file_path" >"$tmp_file" && mv "$tmp_file" "$file_path"
 }
 
+json_factor_status() {
+  local json="$1"
+  local factor="$2"
+
+  printf '%s\n' "$json" | awk -v factor="$factor" '
+    $0 ~ "\"" factor "\":[[:space:]]*\\{" {
+      in_factor = 1
+      next
+    }
+    in_factor && /"status":[[:space:]]*"/ {
+      sub(/^.*"status":[[:space:]]*"/, "", $0)
+      sub(/".*$/, "", $0)
+      print
+      exit
+    }
+    in_factor && /^    }/ {
+      exit
+    }
+  '
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --only)
@@ -104,6 +125,8 @@ DEV_KIT_BIN_DIR="$TEST_HOME/.local/bin"
 mkdir -p "$DEV_KIT_BIN_DIR"
 ln -sf "$REPO_DIR/bin/dev-kit" "$DEV_KIT_BIN_DIR/dev.kit"
 export PATH="$DEV_KIT_BIN_DIR:$PATH"
+assert_contains "$(command -v dev.kit)" "$DEV_KIT_BIN_DIR/dev.kit" "suite: uses local dev.kit shim"
+assert_contains "$(dev.kit --version)" "$(awk -F'"' '/"version"/{print $4; exit}' "$REPO_DIR/package.json")" "suite: uses checkout dev.kit version"
 
 # shellcheck disable=SC1090
 . "$DEV_KIT_HOME/bin/env/dev-kit.sh"
@@ -146,6 +169,8 @@ if should_run_explicit "repo-contract"; then
 
   docker_repo_json="$(cd "$DOCKER_ACTION_REPO" && dev.kit repo --json)"
   assert_contains "$docker_repo_json" "\"context\":" "repo contract: docker repo reports context path"
+  assert_contains "$(json_factor_status "$docker_repo_json" config)" "present" "repo contract: reports present config factor"
+  assert_contains "$docker_repo_json" "config contract manifest: deploy.yml" "repo contract: manifest config shape satisfies config contract"
 
   docker_context_yaml="${DOCKER_ACTION_REPO}/.rabbit/context.yaml"
   assert_contains "$(cat "$docker_context_yaml")" "path: deploy.yml" "repo contract: includes deploy manifest"
@@ -364,6 +389,8 @@ if should_run "core"; then
 
   docker_repo_json="$(cd "$DOCKER_ACTION_REPO" && dev.kit repo --json)"
   assert_contains "$docker_repo_json" "\"context\":" "docker repo: reports context path"
+  assert_contains "$(json_factor_status "$docker_repo_json" config)" "present" "docker repo: reports present config factor"
+  assert_contains "$docker_repo_json" "config contract manifest: deploy.yml" "docker repo: manifest config shape satisfies config contract"
 
   docker_context_yaml="${DOCKER_ACTION_REPO}/.rabbit/context.yaml"
   assert_contains "$(cat "$docker_context_yaml")" "generator:" "docker repo: includes generator metadata"
@@ -385,6 +412,8 @@ EOF
   cat > "$IGNORED_ACTION_REPO/deploy.yml" <<'EOF'
 version: udx.io/worker-v1/deploy
 kind: workerDeployConfig
+metadata:
+  env: staging
 EOF
   cat > "$IGNORED_ACTION_REPO/.next/cache/reference.txt" <<'EOF'
 deploy.yml
@@ -392,6 +421,7 @@ EOF
 
   ignored_repo_json="$(cd "$IGNORED_ACTION_REPO" && dev.kit repo --json)"
   assert_contains "$ignored_repo_json" "\"context\":" "ignored repo: reports context path"
+  assert_contains "$ignored_repo_json" "no canonical checked-in config contract is declared yet" "ignored repo: deploy filename alone does not satisfy config contract"
   ignored_context_yaml="${IGNORED_ACTION_REPO}/.rabbit/context.yaml"
   assert_not_contains "$(cat "$ignored_context_yaml")" ".next/cache/reference.txt" "ignored repo: excludes gitignored artifact references"
 

@@ -79,7 +79,7 @@ gaps:
     message: No explicit configuration contract was detected.
 ```
 
-That should lead to a repo change such as adding config docs, manifest metadata, or a checked-in example file, then regenerating context.
+That should lead to a repo change such as adding config docs, adding explicit manifest metadata, declaring runtime config sections in a repo-owned manifest, or adding a checked-in example file, then regenerating context.
 
 ## What Does Not Belong There
 

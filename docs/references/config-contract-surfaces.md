@@ -11,7 +11,7 @@ Configuration is often declared through:
 - `.env.example`, `.env.sample`, or `.env.template`
 - focused repo docs such as `README.md` or `docs/config.md`
 - deploy manifests such as `deploy.yml`
-- versioned YAML/JSON manifests with explicit config metadata
+- versioned YAML/JSON manifests with explicit config metadata or runtime config sections
 - checked-in example config files when the repo uses a custom format
 
 ## Build defaults and runtime overlays
@@ -25,6 +25,8 @@ Example pattern:
 - the running server resolves runtime values from host env rather than relying only on build-time client env expansion
 
 That is still one coherent repo contract as long as the split is explicit and checked in.
+
+Custom manifests should not rely on filename rules. For YAML manifests, `dev.kit` treats explicit contract metadata such as `contract: config` or runtime config sections such as `config.env`, `config.environment`, `config.image`, `config.command`, or top-level `env`/`variables`/`settings` as configuration contract evidence.
 
 ## Practical rule
 

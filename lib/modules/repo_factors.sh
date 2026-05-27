@@ -54,6 +54,89 @@ dev_kit_repo_has_meaningful_dependency_contract() {
   return 1
 }
 
+dev_kit_manifest_declares_config_contract() {
+  local manifest_path="$1"
+
+  [ -f "$manifest_path" ] || return 1
+
+  awk '
+    /^[[:space:]]*#/ { next }
+    /^[^[:space:]][^:]*:/ {
+      in_contracts = 0
+      in_config = 0
+    }
+    /^[[:space:]]*contracts:[[:space:]]*$/ {
+      in_contracts = 1
+      next
+    }
+    /^[[:space:]]*contracts:[[:space:]]*/ {
+      value = $0
+      sub(/^[[:space:]]*contracts:[[:space:]]*/, "", value)
+      gsub(/["'\''\[\],]/, " ", value)
+      if (value ~ /(^|[[:space:]])config([[:space:]]|$)/) {
+        found = 1
+      }
+      in_contracts = 0
+      next
+    }
+    /^[[:space:]]*contract:[[:space:]]*/ {
+      value = $0
+      sub(/^[[:space:]]*contract:[[:space:]]*/, "", value)
+      gsub(/["'\''\[\],]/, " ", value)
+      if (value ~ /(^|[[:space:]])config([[:space:]]|$)/) {
+        found = 1
+      }
+      next
+    }
+    in_contracts && /^[[:space:]]*-[[:space:]]*/ {
+      value = $0
+      sub(/^[[:space:]]*-[[:space:]]*/, "", value)
+      gsub(/["'\'',]/, " ", value)
+      if (value ~ /(^|[[:space:]])config([[:space:]]|$)/) {
+        found = 1
+      }
+      next
+    }
+    /^[[:space:]]*config:[[:space:]]*$/ {
+      in_config = 1
+      next
+    }
+    /^(env|environment|secrets|variables|settings):[[:space:]]*/ {
+      found = 1
+      next
+    }
+    in_config && /^[[:space:]]+[A-Za-z0-9_.-]+:[[:space:]]*/ {
+      value = $0
+      sub(/^[[:space:]]+/, "", value)
+      sub(/:.*/, "", value)
+      if (value ~ /^(env|environment|secrets|variables|settings|image|images|container|containers|service|services|command|args|volumes)$/) {
+        found = 1
+      }
+      next
+    }
+    END { exit(found ? 0 : 1) }
+  ' "$manifest_path"
+}
+
+dev_kit_repo_config_contract_manifest_files() {
+  local repo_dir="$1"
+  local path=""
+
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if dev_kit_manifest_declares_config_contract "${repo_dir}/${path}"; then
+      printf '%s\n' "$path"
+    fi
+  done <<EOF
+$(dev_kit_repo_contract_manifest_files "$repo_dir")
+EOF
+}
+
+dev_kit_repo_has_config_contract_manifest() {
+  local repo_dir="$1"
+  [ -n "$(dev_kit_repo_config_contract_manifest_files "$repo_dir")" ]
+}
+
 dev_kit_repo_factor_applicable() {
   local repo_dir="$1"
   local factor="$2"
@@ -120,7 +203,8 @@ _dev_kit_repo_factor_status_compute() {
       fi
       ;;
     config)
-      if dev_kit_repo_has_any_file_from_list "$repo_dir" "config_contract_files"; then
+      if dev_kit_repo_has_any_file_from_list "$repo_dir" "config_contract_files" || \
+         dev_kit_repo_has_config_contract_manifest "$repo_dir"; then
         printf "%s" "present"
       elif dev_kit_repo_has_any_file_from_list "$repo_dir" "config_runtime_files" || dev_kit_repo_documented_env_var "$repo_dir"; then
         printf "%s" "partial"
@@ -230,6 +314,13 @@ EOF
         fi
       done <<EOF
 $(dev_kit_detection_list "config_contract_files")
+EOF
+      while IFS= read -r path; do
+        [ -n "$path" ] || continue
+        evidence="${evidence}config contract manifest: ${path}
+"
+      done <<EOF
+$(dev_kit_repo_config_contract_manifest_files "$repo_dir")
 EOF
       while IFS= read -r path; do
         [ -n "$path" ] || continue
