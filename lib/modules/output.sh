@@ -189,9 +189,9 @@ dev_kit_run_guarded() {
 
   local stdout_file=""
   local stderr_file=""
-  local pgid_file=""
+  local group_leader_file=""
   local pid=""
-  local guarded_pgid=""
+  local guarded_group_leader=""
   local started_at=""
   local now=""
   local elapsed=0
@@ -204,15 +204,17 @@ dev_kit_run_guarded() {
     rm -f "$stdout_file"
     return 1
   }
-  pgid_file="$(mktemp "${TMPDIR:-/tmp}/dev-kit-guard-pgid.XXXXXX")" || {
+  group_leader_file="$(mktemp "${TMPDIR:-/tmp}/dev-kit-guard-group.XXXXXX")" || {
     rm -f "$stdout_file" "$stderr_file"
     return 1
   }
 
   (
+    # Job control gives the guarded command its own process group in shells
+    # that support it. The child PID is then also the process-group leader.
     set -m 2>/dev/null || true
     "$@" &
-    printf '%s\n' "$!" > "$pgid_file"
+    printf '%s\n' "$!" > "$group_leader_file"
     wait "$!"
   ) >"$stdout_file" 2>"$stderr_file" &
   pid=$!
@@ -231,16 +233,15 @@ dev_kit_run_guarded() {
     fi
 
     if [ "$hard_timeout" -gt 0 ] && [ "$elapsed" -ge "$hard_timeout" ]; then
-      guarded_pgid="$(cat "$pgid_file" 2>/dev/null || true)"
-      timeout_pids="$(dev_kit_process_descendants "$pid")
-$pid"
-      if [ -n "$guarded_pgid" ]; then
-        kill -TERM "-${guarded_pgid}" 2>/dev/null || true
+      guarded_group_leader="$(cat "$group_leader_file" 2>/dev/null || true)"
+      timeout_pids="$(printf '%s\n%s\n' "$(dev_kit_process_descendants "$pid")" "$pid")"
+      if [ -n "$guarded_group_leader" ]; then
+        kill -TERM "-${guarded_group_leader}" 2>/dev/null || true
       fi
       dev_kit_process_signal_list TERM "$timeout_pids"
       sleep 1
-      if [ -n "$guarded_pgid" ]; then
-        kill -KILL "-${guarded_pgid}" 2>/dev/null || true
+      if [ -n "$guarded_group_leader" ]; then
+        kill -KILL "-${guarded_group_leader}" 2>/dev/null || true
       fi
       dev_kit_process_signal_list KILL "$timeout_pids"
       wait "$pid" 2>/dev/null || true
@@ -249,7 +250,7 @@ $pid"
       [ -s "$stderr_file" ] && cat "$stderr_file" >&2
       printf 'dev.kit timeout: %s exceeded %ss and was stopped to prevent an endless run.\n' \
         "$label" "$hard_timeout" >&2
-      rm -f "$stdout_file" "$stderr_file" "$pgid_file"
+      rm -f "$stdout_file" "$stderr_file" "$group_leader_file"
       return 124
     fi
   done
@@ -260,7 +261,7 @@ $pid"
 
   [ -s "$stdout_file" ] && cat "$stdout_file"
   [ -s "$stderr_file" ] && cat "$stderr_file" >&2
-  rm -f "$stdout_file" "$stderr_file" "$pgid_file"
+  rm -f "$stdout_file" "$stderr_file" "$group_leader_file"
   return "$status"
 }
 

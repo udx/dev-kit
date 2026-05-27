@@ -713,7 +713,10 @@ dev_kit_context_yaml_write() {
   local context_path="${repo_root}/.rabbit/context.yaml"
   local tmp_context_path=""
   dev_kit_repo_ensure_default_structure "$repo_root"
-  tmp_context_path="$(mktemp "${context_path}.tmp.XXXXXX")"
+  tmp_context_path="$(mktemp "${context_path}.tmp.XXXXXX")" || {
+    printf 'Failed to create temporary context file for %s\n' "$context_path" >&2
+    return 1
+  }
 
   local _repo _arch _arch_desc
   _repo="$(dev_kit_repo_name "$repo_root")"
@@ -1098,7 +1101,11 @@ EOF
     return 1
   fi
 
-  mv "$tmp_context_path" "$context_path"
+  if ! mv "$tmp_context_path" "$context_path"; then
+    rm -f "$tmp_context_path"
+    printf 'Failed to move generated context into place: %s\n' "$context_path" >&2
+    return 1
+  fi
 
   printf "%s" "$context_path"
 }
