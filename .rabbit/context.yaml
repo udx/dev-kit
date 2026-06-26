@@ -5,8 +5,8 @@ version: udx.dev/dev.kit/v1
 generator:
   tool: dev.kit
   repo: https://github.com/udx/dev.kit
-  version: 0.13.0
-  generated_at: 2026-05-27T18:39:54Z
+  version: 0.14.0
+  generated_at: 2026-06-26T10:41:30Z
   sources:
     homepage: https://udx.dev/kit
     repository: https://github.com/udx/dev.kit
@@ -26,10 +26,7 @@ refs:
   - ./README.md
   - ./changes.md
   - ./Makefile
-  - ./docs/references/command-surfaces.md
   - ./docs/real-repo-validation.md
-  - ./docs/references/output-schemas.md
-  - ./docs/references/repo-design.md
   - ./src/configs/archetypes.yaml
   - ./src/configs/audit-rules.yaml
   - ./src/configs/context-config.yaml
@@ -49,12 +46,6 @@ commands:
   verify:
     run: make test
     source: Makefile
-  build:
-    run: make build
-    source: docs/references/command-surfaces.md
-  run:
-    run: make run
-    source: docs/references/command-surfaces.md
 
 # Dependencies — Meaningful dependency-repo contracts such as reusable workflows, images, or versioned manifests this repo relies on.
 # Note: Capture execution-shaping behavior defined outside the current checkout.
@@ -65,7 +56,7 @@ dependencies:
   - repo: udx/reusable-workflows
     kind: reusable workflow
     resolved: true
-    archetype: workflow-repo
+    archetype: manifest-repo
     used_by:
       - .github/workflows/context7-ops.yml
       - .github/workflows/npm-release-ops.yml

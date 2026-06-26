@@ -16,6 +16,7 @@ DOCKER_ACTION_REPO="$TEST_HOME/docker-action-repo"
 EMPTY_REPO="$TEST_HOME/empty-repo"
 IGNORED_ACTION_REPO="$TEST_HOME/ignored-action-repo"
 WORKFLOW_CONTRACT_REPO="$TEST_HOME/workflow-contract-repo"
+REFERENCE_DOC_COMMAND_REPO="$TEST_HOME/reference-doc-command-repo"
 AVAILABLE_TEST_GROUPS="core repo-contract"
 TEST_ONLY="${DEV_KIT_TEST_ONLY:-}"
 
@@ -163,6 +164,8 @@ if should_run_explicit "repo-contract"; then
   assert_not_contains "$repo_validation_manifest" "source_repo: udx/worker" "repo contract: does not treat probe repo values as manifest source repo"
   assert_not_contains "$self_context_yaml" ".rabbit/dev.kit/" "repo contract: excludes generated rabbit evidence"
   assert_not_contains "$self_context_yaml" ".rabbit/context.yaml.tmp." "repo contract: excludes context temp files from evidence"
+  assert_not_contains "$self_context_yaml" "run: make build" "repo contract: ignores reference-doc build command examples"
+  assert_not_contains "$self_context_yaml" "run: make run" "repo contract: ignores reference-doc run command examples"
 
   cp -R "$DOCKER_REPO" "$DOCKER_ACTION_REPO"
   rm -f "$DOCKER_ACTION_REPO/.rabbit/context.yaml"
@@ -360,6 +363,8 @@ if should_run "core"; then
   assert_not_contains "$repo_validation_manifest" "source_repo: udx/worker" "repo: does not treat probe repo values as manifest source repo"
   assert_not_contains "$self_context_yaml" ".rabbit/dev.kit/" "repo: excludes generated rabbit evidence"
   assert_not_contains "$self_context_yaml" ".rabbit/context.yaml.tmp." "repo: excludes context temp files from evidence"
+  assert_not_contains "$self_context_yaml" "run: make build" "repo: ignores reference-doc build command examples"
+  assert_not_contains "$self_context_yaml" "run: make run" "repo: ignores reference-doc run command examples"
 
   cp -R "$SIMPLE_REPO" "$SIMPLE_ACTION_REPO"
   rm -rf "$SIMPLE_ACTION_REPO/.dev-kit"
@@ -455,6 +460,28 @@ EOF
   assert_contains "$(cat "$workflow_context_yaml")" "path: .github/workflows/deploy.yml" "workflow repo: includes reusable workflow manifest"
   assert_not_contains "$(cat "$workflow_context_yaml")" "path: .github/workflows/ci.yml" "workflow repo: excludes marketplace-only workflow manifest"
   assert_contains "$(cat "$workflow_context_yaml")" "repo: udx/reusable-workflows" "workflow repo: traces reusable workflow dependency"
+
+  mkdir -p "$REFERENCE_DOC_COMMAND_REPO/docs/references"
+  git -C "$REFERENCE_DOC_COMMAND_REPO" init >/dev/null 2>&1
+  cat > "$REFERENCE_DOC_COMMAND_REPO/README.md" <<'EOF'
+# Reference Doc Command Repo
+
+This repo has no build or run command.
+EOF
+  cat > "$REFERENCE_DOC_COMMAND_REPO/docs/references/command-surfaces.md" <<'EOF'
+# Command Surfaces
+
+Examples only:
+
+- `make build`
+- `make run`
+EOF
+
+  reference_doc_json="$(cd "$REFERENCE_DOC_COMMAND_REPO" && dev.kit repo --json)"
+  assert_contains "$reference_doc_json" "\"context\":" "reference docs repo: reports context path"
+  reference_doc_context_yaml="${REFERENCE_DOC_COMMAND_REPO}/.rabbit/context.yaml"
+  assert_not_contains "$(cat "$reference_doc_context_yaml")" "run: make build" "reference docs repo: ignores reference-only build example"
+  assert_not_contains "$(cat "$reference_doc_context_yaml")" "run: make run" "reference docs repo: ignores reference-only run example"
 
   mkdir -p "$EMPTY_REPO"
   git -C "$EMPTY_REPO" init >/dev/null 2>&1

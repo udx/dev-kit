@@ -279,6 +279,9 @@ dev_kit_repo_command_doc_files() {
       AGENTS.md|CLAUDE.md|.rabbit/*) continue ;;
     esac
     case "$ref" in
+      docs/references/*) continue ;;
+    esac
+    case "$ref" in
       *.md|*.markdown) printf '%s/%s\n' "$repo_dir" "$ref" ;;
     esac
   done <<EOF
