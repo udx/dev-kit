@@ -24,9 +24,6 @@ config:
     github_rabbit_action:
       repo: udx/github-rabbit-action
       purpose: action, docs, and workflow context mix
-    rabbit_automation_action:
-      repo: udx/rabbit-automation-action
-      purpose: manifest-heavy repo and config contract sanity check
     dev_kit:
       repo: udx/dev.kit
       purpose: self-hosting sanity check

@@ -29,9 +29,9 @@ The summary should be used to compare:
 
 When one repo looks noisy or inconsistent, repair the strongest repo-owned gap or dev.kit normalization issue, rerun the matrix, and verify the output changed.
 
-For config and manifest contract releases, include `udx/rabbit-automation-action`
-when it is available locally. It is a useful probe because it relies on
-repo-owned manifests instead of generic `.env.example` files.
+For config and manifest contract releases, include at least one available
+manifest-heavy local repo probe. It should rely on repo-owned manifests instead
+of generic `.env.example` files.
 
 ## Public Repo Probes
 

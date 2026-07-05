@@ -5,7 +5,7 @@
 - Ignore command examples from `docs/references/` when generating repo command contracts, preventing reference docs from creating misleading `build` or `run` commands.
 - Add regression coverage for reference-only command examples so generated context stays tied to runnable repo-owned surfaces.
 - Add release verification guidance that distinguishes GitHub release, npm registry, tarball, and npmjs.com UI evidence.
-- Add `udx/rabbit-automation-action` to the real-repo validation matrix as a manifest-heavy config contract probe.
+- Clarify manifest-heavy config contract validation guidance for optional local repo probes.
 - Clarify stale-context output when generated context came from a different `dev.kit` version by showing both the generator and current versions.
 
 ### 0.13.0
