@@ -29,6 +29,10 @@ The summary should be used to compare:
 
 When one repo looks noisy or inconsistent, repair the strongest repo-owned gap or dev.kit normalization issue, rerun the matrix, and verify the output changed.
 
+For config and manifest contract releases, include at least one available
+manifest-heavy local repo probe. It should rely on repo-owned manifests instead
+of generic `.env.example` files.
+
 ## Public Repo Probes
 
 Public repos are useful for compatibility checks, but they should be optional and pinned when used for repeatable release evidence. Upstream repos change for reasons unrelated to dev.kit.
@@ -45,3 +49,15 @@ Do not assert exact output for moving public repos in the default suite.
 ## Write Mode
 
 `tests/real-repos.sh --write` generates `.rabbit/context.yaml` in the target repo. Use it only for temp clones or repos intentionally selected for context regeneration.
+
+## Release Verification
+
+Before reporting a release as published, verify each source precisely:
+
+- GitHub PR is merged into the release branch.
+- GitHub release and tag exist for the intended version.
+- Release workflow completed successfully.
+- npm registry API reports the intended dist-tag and version.
+- npm tarball URL returns a successful response.
+- npmjs.com package page is treated as optional UI evidence because it can lag
+  behind registry metadata.

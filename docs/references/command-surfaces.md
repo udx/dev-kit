@@ -30,6 +30,12 @@ Workflow and operational contracts are often packaged in:
 
 Docs should explain execution behavior, tradeoffs, and decision points. The runnable contract should stay in scripts and manifests.
 
+Repo-specific docs such as `README.md`, `changes.md`, or focused operational
+docs can still declare commands when a repo intentionally keeps its command
+surface in prose. Reusable reference docs under `docs/references/` are examples
+and interpretation guidance; they should not become generated command contracts
+unless a runnable repo surface also declares the same command.
+
 ## Build and deploy may be separate
 
 Some repos intentionally separate:
