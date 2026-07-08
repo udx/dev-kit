@@ -105,6 +105,10 @@ json_factor_status() {
 setup_declared_config_repo() {
   local repo_dir="$1"
 
+  case "$repo_dir" in
+    "$TEST_HOME"/*) rm -rf "$repo_dir" ;;
+    *) fail "refusing to reset fixture outside TEST_HOME: $repo_dir" ;;
+  esac
   mkdir -p "$repo_dir"
   git -C "$repo_dir" init >/dev/null 2>&1
   cat > "$repo_dir/README.md" <<'EOF'

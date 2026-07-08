@@ -262,7 +262,7 @@ $(dev_kit_detection_list "workflow_globs" | sed 's#/[^/]*$##' | awk '!seen[$0]++
 EOF
 }
 
-dev_kit_manifest_declares_contract_marker() {
+dev_kit_manifest_declares_contract_surface() {
   local manifest_path="$1"
 
   [ -f "$manifest_path" ] || return 1
@@ -306,7 +306,7 @@ dev_kit_repo_declared_root_contract_manifest_files() {
     if dev_kit_repo_has_configured_root_contract_manifest_file "$manifest_rel"; then
       continue
     fi
-    if dev_kit_manifest_declares_contract_marker "$manifest_path"; then
+    if dev_kit_manifest_declares_contract_surface "$manifest_path"; then
       printf '%s\n' "$manifest_rel"
     fi
   done <<EOF
@@ -990,22 +990,15 @@ $(dev_kit_context_section_detection_list_values "dependencies" "versioned_dirs")
 EOF
 
     # Source 4b: Versioned manifests declared by repo contract sections
+    local _manifest_contract_files_file
+    _manifest_contract_files_file="$(mktemp "${TMPDIR:-/tmp}/dev-kit-manifest-contract-files.XXXXXX")"
+
     while IFS= read -r _manifest_dir; do
       [ -n "$_manifest_dir" ] && [ -d "${repo_root}/${_manifest_dir}" ] || continue
       while IFS= read -r _vf; do
         [ -f "$_vf" ] || continue
         case "$_vf" in */context.yaml) continue ;; esac
-        local _vf_rel="${_vf#"${repo_root}/"}"
-        local _vf_version _vf_module
-        _vf_version="$(dev_kit_manifest_version_value "$_vf")"
-        if [ -n "$_vf_version" ]; then
-          _vf_module="$(printf '%s' "$_vf_version" | cut -d/ -f3)"
-          if [ -n "$_vf_module" ] && [ "$_vf_module" != "$_vf_version" ]; then
-            printf '%s|manifest contract (%s)|%s\n' "$_vf_version" "$_vf_module" "$_vf_rel" >> "$_dep_triples_file"
-          else
-            printf '%s|manifest contract|%s\n' "$_vf_version" "$_vf_rel" >> "$_dep_triples_file"
-          fi
-        fi
+        printf '%s\n' "${_vf#"${repo_root}/"}" >> "$_manifest_contract_files_file"
       done <<EOF
 $(find "${repo_root}/${_manifest_dir}" -maxdepth 1 \( -name '*.yaml' -o -name '*.yml' \) 2>/dev/null | sort)
 EOF
@@ -1015,22 +1008,21 @@ EOF
 
     while IFS= read -r _vf_rel; do
       [ -n "$_vf_rel" ] && [ -f "${repo_root}/${_vf_rel}" ] || continue
-      local _vf_path="${repo_root}/${_vf_rel}"
-      local _vf_version _vf_module
-      _vf_version="$(dev_kit_manifest_version_value "$_vf_path")"
-      if [ -n "$_vf_version" ]; then
-        _vf_module="$(printf '%s' "$_vf_version" | cut -d/ -f3)"
-        if [ -n "$_vf_module" ] && [ "$_vf_module" != "$_vf_version" ]; then
-          printf '%s|manifest contract (%s)|%s\n' "$_vf_version" "$_vf_module" "$_vf_rel" >> "$_dep_triples_file"
-        else
-          printf '%s|manifest contract|%s\n' "$_vf_version" "$_vf_rel" >> "$_dep_triples_file"
-        fi
-      fi
+      case "$_vf_rel" in */context.yaml) continue ;; esac
+      printf '%s\n' "$_vf_rel" >> "$_manifest_contract_files_file"
     done <<EOF
 $(dev_kit_context_section_detection_list_values "manifests" "root_files")
 EOF
 
     while IFS= read -r _vf_rel; do
+      [ -n "$_vf_rel" ] && [ -f "${repo_root}/${_vf_rel}" ] || continue
+      case "$_vf_rel" in */context.yaml) continue ;; esac
+      printf '%s\n' "$_vf_rel" >> "$_manifest_contract_files_file"
+    done <<EOF
+$(dev_kit_repo_declared_root_contract_manifest_files "$repo_root")
+EOF
+
+    sort -u "$_manifest_contract_files_file" | while IFS= read -r _vf_rel; do
       [ -n "$_vf_rel" ] && [ -f "${repo_root}/${_vf_rel}" ] || continue
       local _vf_path="${repo_root}/${_vf_rel}"
       local _vf_version _vf_module
@@ -1043,9 +1035,7 @@ EOF
           printf '%s|manifest contract|%s\n' "$_vf_version" "$_vf_rel" >> "$_dep_triples_file"
         fi
       fi
-    done <<EOF
-$(dev_kit_repo_declared_root_contract_manifest_files "$repo_root")
-EOF
+    done
 
     # Normalize dependency identifiers so multiple evidence types can collapse
     # into a single repo-level dependency entry.
