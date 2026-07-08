@@ -12,12 +12,14 @@ DOCUMENTED_SHELL_REPO="$REPO_DIR/tests/fixtures/documented-shell-repo"
 DOCKER_REPO="$REPO_DIR/tests/fixtures/docker-repo"
 SIMPLE_ACTION_REPO="$TEST_HOME/simple-action-repo"
 HOME_ACTION_REPO="$TEST_HOME/home-action-repo"
+DOCUMENTED_SHELL_ACTION_REPO="$TEST_HOME/documented-shell-action-repo"
 DOCKER_ACTION_REPO="$TEST_HOME/docker-action-repo"
 EMPTY_REPO="$TEST_HOME/empty-repo"
 IGNORED_ACTION_REPO="$TEST_HOME/ignored-action-repo"
 WORKFLOW_CONTRACT_REPO="$TEST_HOME/workflow-contract-repo"
 DECLARED_CONFIG_REPO="$TEST_HOME/declared-config-repo"
 REFERENCE_DOC_COMMAND_REPO="$TEST_HOME/reference-doc-command-repo"
+PRESERVED_RABBIT_REPO="$TEST_HOME/preserved-rabbit-repo"
 AVAILABLE_TEST_GROUPS="core repo-contract"
 TEST_ONLY="${DEV_KIT_TEST_ONLY:-}"
 
@@ -116,6 +118,9 @@ setup_declared_config_repo() {
 
 Runtime variables are declared in `work-conf.yaml`.
 EOF
+  cat > "$repo_dir/.gitignore" <<'EOF'
+local-private.yaml
+EOF
   cat > "$repo_dir/work-conf.yaml" <<'EOF'
 ---
 # Runtime config contract for the local automation surface.
@@ -134,6 +139,13 @@ contract:
   purpose: local automation interface notes
 refs:
   - README.md
+EOF
+  cat > "$repo_dir/local-private.yaml" <<'EOF'
+---
+kind: localPrivateConfig
+version: example.dev/private-v1/config
+config:
+  env: {}
 EOF
   cat > "$repo_dir/source-notes.yaml" <<'EOF'
 # Source notes with references are useful context, but not a manifest contract.
@@ -235,6 +247,7 @@ if should_run_explicit "repo-contract"; then
   declared_config_dependencies="$(awk '/^dependencies:/{flag=1;next} /^# /{if(flag) exit} flag{print}' "$declared_config_context_yaml")"
   assert_contains "$declared_config_dependencies" "repo: example/runtime" "repo contract: traces declared root YAML manifest owner as dependency"
   assert_not_contains "$(cat "$declared_config_context_yaml")" "path: source-notes.yaml" "repo contract: does not promote source comments alone to manifest"
+  assert_not_contains "$(cat "$declared_config_context_yaml")" "path: local-private.yaml" "repo contract: excludes gitignored root YAML contracts"
 fi
 
 if should_run "core"; then
@@ -382,7 +395,9 @@ if should_run "core"; then
   assert_contains "$env_json" "\"command\": \"env\"" "env: reports command name"
   assert_contains "$env_json" "\"workflow\": {" "env: reports workflow contract"
 
-  repo_json="$(cd "$DOCUMENTED_SHELL_REPO" && dev.kit repo --json)"
+  cp -R "$DOCUMENTED_SHELL_REPO" "$DOCUMENTED_SHELL_ACTION_REPO"
+
+  repo_json="$(cd "$DOCUMENTED_SHELL_ACTION_REPO" && dev.kit repo --json)"
   assert_contains "$repo_json" "\"archetype\":" "repo: reports archetype"
   assert_contains "$repo_json" "\"context\":" "repo: reports context path"
   assert_contains "$repo_json" "\"context_status\": \"current\"" "repo: reports current workflow context after write"
@@ -391,7 +406,7 @@ if should_run "core"; then
   assert_contains "$repo_json" "\"id\": \"confirm-research-fix-loop\"" "repo: includes confirmation loop action"
   assert_contains "$repo_json" "\"workflow\": {" "repo: reports workflow contract"
 
-  repo_text="$(cd "$DOCUMENTED_SHELL_REPO" && dev.kit repo)"
+  repo_text="$(cd "$DOCUMENTED_SHELL_ACTION_REPO" && dev.kit repo)"
   assert_contains "$repo_text" "[workflow]" "repo text: renders workflow section"
   assert_contains "$repo_text" "[read first]" "repo text: renders read first section"
   assert_contains "$repo_text" "[factors]" "repo text: renders factors section"
@@ -407,7 +422,7 @@ if should_run "core"; then
       printf 'boom\n' >&2
       return 42
     }
-    dev_kit_cmd_repo text "$DOCUMENTED_SHELL_REPO" 2>&1
+    dev_kit_cmd_repo text "$DOCUMENTED_SHELL_ACTION_REPO" 2>&1
   )"
   repo_write_failure_status=$?
   set -e
@@ -504,6 +519,7 @@ EOF
   declared_config_dependencies="$(awk '/^dependencies:/{flag=1;next} /^# /{if(flag) exit} flag{print}' "$declared_config_context_yaml")"
   assert_contains "$declared_config_dependencies" "repo: example/runtime" "declared config repo: traces explicit root YAML manifest owner as dependency"
   assert_not_contains "$(cat "$declared_config_context_yaml")" "path: source-notes.yaml" "declared config repo: does not promote source comments alone to manifest"
+  assert_not_contains "$(cat "$declared_config_context_yaml")" "path: local-private.yaml" "declared config repo: excludes gitignored root YAML contracts"
 
   mkdir -p "$WORKFLOW_CONTRACT_REPO/.github/workflows"
   git -C "$WORKFLOW_CONTRACT_REPO" init >/dev/null 2>&1
@@ -558,6 +574,22 @@ EOF
   assert_not_contains "$(cat "$reference_doc_context_yaml")" "run: make build" "reference docs repo: ignores reference-only build example"
   assert_not_contains "$(cat "$reference_doc_context_yaml")" "run: make run" "reference docs repo: ignores reference-only run example"
 
+  mkdir -p "$PRESERVED_RABBIT_REPO/.rabbit" "$PRESERVED_RABBIT_REPO/docs"
+  git -C "$PRESERVED_RABBIT_REPO" init >/dev/null 2>&1
+  cat > "$PRESERVED_RABBIT_REPO/README.md" <<'EOF'
+# Preserved Rabbit Docs Repo
+EOF
+  cat > "$PRESERVED_RABBIT_REPO/.rabbit/README.md" <<'EOF'
+# Existing Rabbit Notes
+
+Keep this repo-specific Rabbit CI guidance.
+EOF
+  preserved_rabbit_json="$(cd "$PRESERVED_RABBIT_REPO" && dev.kit repo --json)"
+  assert_contains "$preserved_rabbit_json" "\"context\":" "preserved rabbit repo: reports context path"
+  assert_contains "$(cat "$PRESERVED_RABBIT_REPO/.rabbit/README.md")" "Existing Rabbit Notes" "preserved rabbit repo: keeps existing rabbit README"
+  assert_not_contains "$(cat "$PRESERVED_RABBIT_REPO/.rabbit/README.md")" "This directory keeps Rabbit-facing repo context" "preserved rabbit repo: does not overwrite rabbit README"
+  assert_file_missing "$PRESERVED_RABBIT_REPO/docs/README.md" "preserved rabbit repo: does not create generic docs README"
+
   mkdir -p "$EMPTY_REPO"
   git -C "$EMPTY_REPO" init >/dev/null 2>&1
 
@@ -573,11 +605,15 @@ EOF
 
   assert_file_exists "$EMPTY_REPO/README.md" "empty repo: creates README"
   assert_file_exists "$EMPTY_REPO/docs" "empty repo: creates docs dir"
+  assert_file_missing "$EMPTY_REPO/docs/README.md" "empty repo: does not create generic docs README"
   assert_file_exists "$EMPTY_REPO/.rabbit" "empty repo: creates rabbit dir"
+  assert_file_exists "$EMPTY_REPO/.rabbit/README.md" "empty repo: creates rabbit README"
   assert_file_exists "$EMPTY_REPO/.github/workflows" "empty repo: creates workflows dir"
   assert_file_exists "$EMPTY_REPO/.github/dependabot.yml" "empty repo: creates dependabot config"
   assert_contains "$(cat "$EMPTY_REPO/.github/dependabot.yml")" "package-ecosystem: github-actions" "empty repo: dependabot targets github actions"
   assert_contains "$(cat "$EMPTY_REPO/README.md")" "This repository uses \`dev.kit\`" "empty repo: seeds README"
+  assert_contains "$(cat "$EMPTY_REPO/.rabbit/README.md")" "Rabbit-facing repo context" "empty repo: seeds rabbit README"
+  assert_contains "$(cat "$EMPTY_REPO/.rabbit/README.md")" "\`context.yaml\` is generated by \`dev.kit repo\`" "empty repo: explains generated context"
 fi
 
 printf "ok - dev.kit suite completed\n"

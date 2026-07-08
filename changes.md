@@ -1,5 +1,10 @@
 # Changes
 
+### 0.20.1
+
+- Keep declared root YAML contract discovery aligned with repo file filtering so gitignored local/private YAML is not promoted into generated context.
+- Seed missing `.rabbit/README.md` files so repos initialized by `dev.kit repo` have a clear Rabbit-facing notes surface without adding a generic `docs/README.md` stub.
+
 ### 0.20.0
 
 - Discover root YAML config contracts from explicit top-level `contract` / `contracts` metadata or typed `kind` + `version` manifests instead of filename-specific allowlists.
