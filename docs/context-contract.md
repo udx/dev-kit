@@ -12,7 +12,7 @@ The generated contract is `.rabbit/context.yaml`.
 - `AGENTS.md`, `CLAUDE.md`, and similar repo-owned instruction files
 - `README.md`, `changes.md`, and focused docs
 - `.github/workflows/`
-- manifests such as `deploy.yml`, package manifests, Docker files, and structured YAML configs
+- manifests such as typed YAML configs, package manifests, Docker files, and workflow contracts
 - scripts, Makefiles, tests, and checked-in examples that define runnable behavior
 
 Live services such as GitHub issues, PRs, reviews, and workflow runs can help a current task, but they should not become durable repo truth inside `.rabbit/context.yaml`.

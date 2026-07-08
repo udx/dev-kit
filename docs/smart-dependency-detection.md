@@ -29,7 +29,7 @@ If `dev.kit` can resolve a dependency confidently, it records:
 Example:
 
 ```yaml
-version: udx.io/worker-v1/deploy
+version: example.dev/runtime-v1/config
 ```
 
 That kind of versioned manifest header can be normalized into a dependency repo contract when the repo evidence is strong enough.

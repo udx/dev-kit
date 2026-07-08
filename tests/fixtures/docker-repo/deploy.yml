@@ -1,5 +1,0 @@
-kind: workerDeployConfig
-version: udx.io/worker-v1/deploy
-
-config:
-  image: "acme/docker-repo:latest"

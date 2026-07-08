@@ -198,7 +198,7 @@ dev_kit_env_tool_state() {
 # Compute tool detection lines. Recomputed on each run.
 _dev_kit_env_compute_tool_lines() {
   local tool=""
-  for tool in git gh npm docker yq jq aws gcloud az "@udx/worker-deployment" "@udx/mcurl"; do
+  for tool in git gh npm docker yq jq aws gcloud az "@udx/mcurl"; do
     printf '%s|%s|%s\n' "$tool" "$(dev_kit_env_tool_category "$tool")" "$(dev_kit_env_tool_state "$tool")"
   done
 }
@@ -241,7 +241,7 @@ dev_kit_env_tool_presence_state() {
 
 _dev_kit_env_compute_tool_presence_lines() {
   local tool=""
-  for tool in git gh npm docker yq jq aws gcloud az "@udx/worker-deployment" "@udx/mcurl"; do
+  for tool in git gh npm docker yq jq aws gcloud az "@udx/mcurl"; do
     printf '%s|%s|%s\n' "$tool" "$(dev_kit_env_tool_category "$tool")" "$(dev_kit_env_tool_presence_state "$tool")"
   done
 }
@@ -327,7 +327,6 @@ dev_kit_env_tool_enables() {
     aws)    printf 'AWS cloud operations' ;;
     gcloud) printf 'Google Cloud operations' ;;
     az)     printf 'Azure cloud operations' ;;
-    "@udx/worker-deployment") printf 'UDX deployment workflows' ;;
     "@udx/mcurl")             printf 'web fetches for agents' ;;
     *)      printf 'general tooling' ;;
   esac

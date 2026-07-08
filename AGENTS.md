@@ -24,7 +24,7 @@ _Normalized repo-owned guidance for agents. Keep it aligned with `docs/reference
 
 ## Workflow
 
-- read: `README.md`, `changes.md`, `deploy.yml`, `.github/workflows/`, `docs/`
+- read: `README.md`, `changes.md`, `.github/workflows/`, `docs/`
 - verify: `make test`
 
 ## Notes

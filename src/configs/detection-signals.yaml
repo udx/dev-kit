@@ -50,8 +50,6 @@ config:
   config_runtime_files:
     - docker-compose.yml
     - docker-compose.yaml
-    - deploy.yml
-    - deploy.yaml
   test_dirs:
     - tests
     - test
@@ -66,8 +64,6 @@ config:
     - action.yml
     - action.yaml
   deploy_files:
-    - deploy.yml
-    - deploy.yaml
     - docker-compose.yml
     - docker-compose.yaml
   yaml_manifest_globs:
@@ -96,8 +92,6 @@ config:
     - terraform/modules
     - modules
   manifest_root_files:
-    - deploy.yml
-    - deploy.yaml
     - docker-compose.yml
     - docker-compose.yaml
     - Chart.yaml

@@ -25,7 +25,7 @@ Workflow and operational contracts are often packaged in:
 - `.github/workflows/*.yml` when the workflow expresses repo-specific execution contracts
 - reusable workflow refs
 - Docker build and runtime files
-- deploy manifests such as `deploy.yml`
+- typed runtime manifests and workflow files
 - repo docs that explain how those assets fit together
 
 Docs should explain execution behavior, tradeoffs, and decision points. The runnable contract should stay in scripts and manifests.
@@ -80,7 +80,7 @@ A repo may expose its main flow through a mix like:
 
 - `Makefile` for `make test`, `make build`, `make run`
 - `.github/workflows/` for CI/CD execution
-- `deploy.yml` for deploy contract details
+- typed runtime manifests or workflow files for deploy contract details
 - `docs/` for operator-facing explanation
 
 That is valid as long as the repo makes those surfaces clear and traceable.

@@ -10,14 +10,13 @@ test:
 test-real:
 	bash tests/real-repos.sh
 
-# Run tests inside the worker container via deploy.yml
-# Requires @udx/worker-deployment: npm install -g @udx/worker-deployment
+# Run tests inside the worker container without the deprecated worker-deployment manifest.
 test-docker:
-	worker run
+	docker run --rm -v "$(CURDIR):/workspace" -w /workspace $(WORKER_IMAGE) bash tests/suite.sh
 
 # Interactive shell inside the worker container for debugging
 test-shell:
-	worker run run-it
+	docker run --rm -it -v "$(CURDIR):/workspace" -w /workspace $(WORKER_IMAGE) bash
 
 # Pull the worker image explicitly
 test-docker-pull:

@@ -1,5 +1,10 @@
 name: Release
 
+# Release strategy and pre-actions:
+# - docs/release.md
+# Release probe and publication verification guidance:
+# - docs/real-repo-validation.md
+
 on:
   push:
   workflow_dispatch:

@@ -182,6 +182,7 @@ All commands support `--json`.
 - [Environment Config](docs/environment-config.md)
 - [Context Coverage](docs/context-coverage.md)
 - [Integration](docs/integration.md)
+- [Release](docs/release.md)
 - [Real Repo Validation](docs/real-repo-validation.md)
 - [Smart Dependency Detection](docs/smart-dependency-detection.md)
 - [Reference Docs](docs/references/README.md)
