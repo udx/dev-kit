@@ -5,8 +5,8 @@ version: udx.dev/dev.kit/v1
 generator:
   tool: dev.kit
   repo: https://github.com/udx/dev.kit
-  version: 0.14.0
-  generated_at: 2026-07-05T18:19:05Z
+  version: 0.20.0
+  generated_at: 2026-07-08T14:55:18Z
   sources:
     homepage: https://udx.dev/kit
     repository: https://github.com/udx/dev.kit
@@ -27,13 +27,14 @@ refs:
   - ./changes.md
   - ./Makefile
   - ./docs/real-repo-validation.md
+  - ./docs/release.md
   - ./src/configs/archetypes.yaml
   - ./src/configs/audit-rules.yaml
   - ./src/configs/context-config.yaml
   - ./src/configs/detection-patterns.yaml
   - ./src/configs/detection-signals.yaml
   - ./src/configs/repo-validation.yaml
-  - ./deploy.yml
+  - ./env-interface.yaml
   - ./.github/workflows
   - ./docs
 
@@ -60,13 +61,6 @@ dependencies:
     used_by:
       - .github/workflows/context7-ops.yml
       - .github/workflows/npm-release-ops.yml
-  - repo: udx/worker
-    kind: manifest contract (deploy)
-    resolved: true
-    declared_as: udx.io/worker-v1/deploy
-    archetype: manifest-repo
-    used_by:
-      - deploy.yml
 
 # Manifests — YAML files that define repo-specific workflow, deploy, or contract behavior.
 # Note: Include custom config/manifests that materially shape repo behavior or contract understanding.
@@ -143,28 +137,12 @@ manifests:
       - path reference: docs/real-repo-validation.md
       - path reference: lib/modules/config_catalog.sh
       - path reference: tests/real-repos.sh
-  - path: deploy.yml
-    kind: workerDeployConfig
-    declared_as: udx.io/worker-v1/deploy
-    source_repo: udx/worker
+  - path: env-interface.yaml
+    kind: devKitEnvInterface
+    description: Environment variables that control dev.kit installation, command behavior, and test probes.
+    declared_as: udx.dev/dev.kit-v1/config
     used_by:
-      - Makefile
-      - docs/context-contract.md
-      - docs/references/command-surfaces.md
-      - docs/references/config-contract-surfaces.md
-      - docs/repo-contract-boundary.md
-      - lib/modules/repo_factors.sh
-      - src/configs/context-config.yaml
-      - src/configs/detection-signals.yaml
-      - tests/suite.sh
+      - changes.md
     evidence:
-      - version: udx.io/worker-v1/deploy
-      - path reference: Makefile
-      - path reference: docs/context-contract.md
-      - path reference: docs/references/command-surfaces.md
-      - path reference: docs/references/config-contract-surfaces.md
-      - path reference: docs/repo-contract-boundary.md
-      - path reference: lib/modules/repo_factors.sh
-      - path reference: src/configs/context-config.yaml
-      - path reference: src/configs/detection-signals.yaml
-      - path reference: tests/suite.sh
+      - version: udx.dev/dev.kit-v1/config
+      - path reference: changes.md

@@ -1,0 +1,34 @@
+---
+# dev.kit CLI environment interface.
+# References:
+# - docs/environment-config.md
+# - bin/scripts/install.sh
+# - lib/modules/local_env.sh
+kind: devKitEnvInterface
+version: udx.dev/dev.kit-v1/config
+description: Environment variables that control dev.kit installation, command behavior, and test probes.
+
+config:
+  env:
+    DEV_KIT_HOME:
+      description: dev.kit home directory for curl-managed installs and local config.
+      required: false
+    DEV_KIT_BIN_DIR:
+      description: Directory where dev.kit command shims are installed.
+      required: false
+    DEV_KIT_INSTALL_REPO:
+      description: GitHub repository used by the curl installer.
+      required: false
+    DEV_KIT_INSTALL_REF:
+      description: Branch or ref used by the curl installer.
+      required: false
+    DEV_KIT_REPO_SOFT_TIMEOUT:
+      description: Seconds before repo generation reports a slow-operation notice.
+      required: false
+    DEV_KIT_REPO_HARD_TIMEOUT:
+      description: Seconds before repo generation stops a guarded operation.
+      required: false
+    DEV_KIT_SPINNER_DISABLE:
+      description: Disable spinner output for tests and non-interactive runs.
+      required: false
+  secrets: {}

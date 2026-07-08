@@ -10,7 +10,7 @@ Configuration is often declared through:
 
 - `.env.example`, `.env.sample`, or `.env.template`
 - focused repo docs such as `README.md` or `docs/config.md`
-- deploy manifests such as `deploy.yml`
+- typed YAML manifests with explicit config metadata
 - versioned YAML/JSON manifests with explicit config metadata or runtime config sections
 - checked-in example config files when the repo uses a custom format
 

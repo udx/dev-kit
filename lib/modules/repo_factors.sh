@@ -662,7 +662,7 @@ dev_kit_repo_factor_repair_target() {
         printf '%s' "$first_workflow"
         return 0
       fi
-      printf '%s' "deploy.yml or .github/workflows/"
+      printf '%s' ".github/workflows/ or dependency manifest"
       return 0
       ;;
     dependencies:missing)
@@ -671,7 +671,7 @@ dev_kit_repo_factor_repair_target() {
         printf '%s' "$first_workflow"
         return 0
       fi
-      printf '%s' "deploy.yml or .github/workflows/"
+      printf '%s' ".github/workflows/ or dependency manifest"
       return 0
       ;;
     config:partial)
@@ -775,11 +775,6 @@ dev_kit_repo_dependency_reference_local() {
     return 0
   fi
 
-  if dev_kit_has_file "$repo_dir" "deploy.yml"; then
-    printf '%s' "deploy.yml"
-    return 0
-  fi
-
   dev_kit_repo_reference_doc_default "$repo_dir"
 }
 
@@ -822,11 +817,6 @@ dev_kit_repo_pipeline_reference_local() {
   first_workflow="$(dev_kit_repo_first_existing_signal "$repo_dir" "workflow_primary_files" 2>/dev/null || true)"
   if [ -n "$first_workflow" ]; then
     printf '%s' "$first_workflow"
-    return 0
-  fi
-
-  if dev_kit_has_file "$repo_dir" "deploy.yml"; then
-    printf '%s' "deploy.yml"
     return 0
   fi
 

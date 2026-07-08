@@ -17,7 +17,7 @@ Use **scripts and manifests** for programmatic execution:
 
 - `Makefile`, `package.json`, and shell scripts
 - `.github/workflows/*.yml`
-- deploy manifests such as `deploy.yml`
+- typed YAML manifests and workflow contracts
 - checked-in config examples when they are part of the runnable contract
 
 Use **structured refs** for deterministic parsing:

@@ -71,8 +71,6 @@ config:
   repo_root_files:
     - README.md
     - readme.md
-    - deploy.yml
-    - deploy.yaml
     - package.json
     - Dockerfile
     - Makefile
@@ -112,12 +110,6 @@ config:
       paths:
         - README.md
         - readme.md
-    deploy_files:
-      prefix: deploy
-      kind: file
-      paths:
-        - deploy.yml
-        - deploy.yaml
     make_build:
       prefix: build
       kind: file

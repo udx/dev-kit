@@ -16,6 +16,7 @@ DOCKER_ACTION_REPO="$TEST_HOME/docker-action-repo"
 EMPTY_REPO="$TEST_HOME/empty-repo"
 IGNORED_ACTION_REPO="$TEST_HOME/ignored-action-repo"
 WORKFLOW_CONTRACT_REPO="$TEST_HOME/workflow-contract-repo"
+DECLARED_CONFIG_REPO="$TEST_HOME/declared-config-repo"
 REFERENCE_DOC_COMMAND_REPO="$TEST_HOME/reference-doc-command-repo"
 AVAILABLE_TEST_GROUPS="core repo-contract"
 TEST_ONLY="${DEV_KIT_TEST_ONLY:-}"
@@ -101,6 +102,44 @@ json_factor_status() {
   '
 }
 
+setup_declared_config_repo() {
+  local repo_dir="$1"
+
+  mkdir -p "$repo_dir"
+  git -C "$repo_dir" init >/dev/null 2>&1
+  cat > "$repo_dir/README.md" <<'EOF'
+# Declared Config Repo
+
+Runtime variables are declared in `work-conf.yaml`.
+EOF
+  cat > "$repo_dir/work-conf.yaml" <<'EOF'
+---
+# Runtime config contract for the local automation surface.
+# References:
+# - https://github.com/example/runtime/blob/main/docs/config.md
+kind: customRuntimeConfig
+version: example.dev/runtime-v1/config
+config:
+  env: {}
+  secrets: {}
+EOF
+  cat > "$repo_dir/interface-contract.yaml" <<'EOF'
+---
+# Explicit contract marker without typed version metadata.
+contract:
+  purpose: local automation interface notes
+refs:
+  - README.md
+EOF
+  cat > "$repo_dir/source-notes.yaml" <<'EOF'
+# Source notes with references are useful context, but not a manifest contract.
+sources:
+  - https://github.com/example/runtime/blob/main/docs/config.md
+refs:
+  - README.md
+EOF
+}
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --only)
@@ -173,16 +212,25 @@ if should_run_explicit "repo-contract"; then
 
   docker_repo_json="$(cd "$DOCKER_ACTION_REPO" && dev.kit repo --json)"
   assert_contains "$docker_repo_json" "\"context\":" "repo contract: docker repo reports context path"
-  assert_contains "$(json_factor_status "$docker_repo_json" config)" "present" "repo contract: reports present config factor"
-  assert_contains "$docker_repo_json" "config contract manifest: deploy.yml" "repo contract: manifest config shape satisfies config contract"
 
   docker_context_yaml="${DOCKER_ACTION_REPO}/.rabbit/context.yaml"
-  assert_contains "$(cat "$docker_context_yaml")" "path: deploy.yml" "repo contract: includes deploy manifest"
-  assert_contains "$(cat "$docker_context_yaml")" "path: .rabbit/deploy.yml" "repo contract: includes hidden custom manifest"
   assert_contains "$(cat "$docker_context_yaml")" "path: .rabbit/infra_configs/staging/k8s-configmap.yaml" "repo contract: inventories nested rabbit manifests"
   docker_context_refs="$(awk '/^refs:/{flag=1;next} /^# Commands/{if(flag) exit} flag{print}' "$docker_context_yaml")"
   assert_not_contains "$docker_context_refs" ".rabbit/infra_configs/staging/k8s-configmap.yaml" "repo contract: excludes nested rabbit manifests from read-first refs"
-  assert_contains "$(cat "$docker_context_yaml")" "source_repo: udx/worker" "repo contract: traces manifest owner from version"
+
+  setup_declared_config_repo "$DECLARED_CONFIG_REPO"
+  declared_config_json="$(cd "$DECLARED_CONFIG_REPO" && dev.kit repo --json)"
+  assert_contains "$(json_factor_status "$declared_config_json" config)" "present" "repo contract: declared root YAML config contract is present"
+  assert_contains "$declared_config_json" "config contract manifest: work-conf.yaml" "repo contract: reports declared root YAML config contract"
+  declared_config_context_yaml="${DECLARED_CONFIG_REPO}/.rabbit/context.yaml"
+  assert_contains "$(cat "$declared_config_context_yaml")" "path: work-conf.yaml" "repo contract: includes declared root YAML manifest"
+  assert_contains "$(cat "$declared_config_context_yaml")" "path: interface-contract.yaml" "repo contract: includes contract-marker root YAML manifest"
+  assert_contains "$(cat "$declared_config_context_yaml")" "kind: customRuntimeConfig" "repo contract: records declared root YAML manifest kind"
+  assert_contains "$(cat "$declared_config_context_yaml")" "source_repo: example/runtime" "repo contract: traces declared root YAML manifest owner from version"
+  assert_contains "$(cat "$declared_config_context_yaml")" "github reference: example/runtime" "repo contract: records declared root YAML manifest header refs"
+  declared_config_dependencies="$(awk '/^dependencies:/{flag=1;next} /^# /{if(flag) exit} flag{print}' "$declared_config_context_yaml")"
+  assert_contains "$declared_config_dependencies" "repo: example/runtime" "repo contract: traces declared root YAML manifest owner as dependency"
+  assert_not_contains "$(cat "$declared_config_context_yaml")" "path: source-notes.yaml" "repo contract: does not promote source comments alone to manifest"
 fi
 
 if should_run "core"; then
@@ -409,17 +457,12 @@ if should_run "core"; then
 
   docker_repo_json="$(cd "$DOCKER_ACTION_REPO" && dev.kit repo --json)"
   assert_contains "$docker_repo_json" "\"context\":" "docker repo: reports context path"
-  assert_contains "$(json_factor_status "$docker_repo_json" config)" "present" "docker repo: reports present config factor"
-  assert_contains "$docker_repo_json" "config contract manifest: deploy.yml" "docker repo: manifest config shape satisfies config contract"
 
   docker_context_yaml="${DOCKER_ACTION_REPO}/.rabbit/context.yaml"
   assert_contains "$(cat "$docker_context_yaml")" "generator:" "docker repo: includes generator metadata"
-  assert_contains "$(cat "$docker_context_yaml")" "path: deploy.yml" "docker repo: includes deploy manifest"
-  assert_contains "$(cat "$docker_context_yaml")" "path: .rabbit/deploy.yml" "docker repo: includes hidden custom manifest"
   assert_contains "$(cat "$docker_context_yaml")" "path: .rabbit/infra_configs/staging/k8s-configmap.yaml" "docker repo: inventories nested rabbit manifests"
   docker_context_refs="$(awk '/^refs:/{flag=1;next} /^# Commands/{if(flag) exit} flag{print}' "$docker_context_yaml")"
   assert_not_contains "$docker_context_refs" ".rabbit/infra_configs/staging/k8s-configmap.yaml" "docker repo: excludes nested rabbit manifests from read-first refs"
-  assert_contains "$(cat "$docker_context_yaml")" "source_repo: udx/worker" "docker repo: traces manifest owner from version"
 
   mkdir -p "$IGNORED_ACTION_REPO/.next/cache"
   git -C "$IGNORED_ACTION_REPO" init >/dev/null 2>&1
@@ -429,21 +472,34 @@ EOF
   cat > "$IGNORED_ACTION_REPO/.gitignore" <<'EOF'
 .next/
 EOF
-  cat > "$IGNORED_ACTION_REPO/deploy.yml" <<'EOF'
-version: udx.io/worker-v1/deploy
-kind: workerDeployConfig
+  cat > "$IGNORED_ACTION_REPO/runtime.yaml" <<'EOF'
+version: example.dev/runtime-v1/config
+kind: runtimeConfig
 metadata:
   env: staging
 EOF
   cat > "$IGNORED_ACTION_REPO/.next/cache/reference.txt" <<'EOF'
-deploy.yml
+runtime.yaml
 EOF
 
   ignored_repo_json="$(cd "$IGNORED_ACTION_REPO" && dev.kit repo --json)"
   assert_contains "$ignored_repo_json" "\"context\":" "ignored repo: reports context path"
-  assert_contains "$ignored_repo_json" "no canonical checked-in config contract is declared yet" "ignored repo: deploy filename alone does not satisfy config contract"
   ignored_context_yaml="${IGNORED_ACTION_REPO}/.rabbit/context.yaml"
   assert_not_contains "$(cat "$ignored_context_yaml")" ".next/cache/reference.txt" "ignored repo: excludes gitignored artifact references"
+
+  setup_declared_config_repo "$DECLARED_CONFIG_REPO"
+  declared_config_json="$(cd "$DECLARED_CONFIG_REPO" && dev.kit repo --json)"
+  assert_contains "$(json_factor_status "$declared_config_json" config)" "present" "declared config repo: explicit config contract satisfies config factor"
+  assert_contains "$declared_config_json" "config contract manifest: work-conf.yaml" "declared config repo: reports explicit config contract"
+  declared_config_context_yaml="${DECLARED_CONFIG_REPO}/.rabbit/context.yaml"
+  assert_contains "$(cat "$declared_config_context_yaml")" "path: work-conf.yaml" "declared config repo: includes explicit root YAML manifest"
+  assert_contains "$(cat "$declared_config_context_yaml")" "path: interface-contract.yaml" "declared config repo: includes contract-marker root YAML manifest"
+  assert_contains "$(cat "$declared_config_context_yaml")" "kind: customRuntimeConfig" "declared config repo: records explicit root YAML manifest kind"
+  assert_contains "$(cat "$declared_config_context_yaml")" "source_repo: example/runtime" "declared config repo: traces explicit root YAML manifest owner from version"
+  assert_contains "$(cat "$declared_config_context_yaml")" "github reference: example/runtime" "declared config repo: records explicit root YAML manifest header refs"
+  declared_config_dependencies="$(awk '/^dependencies:/{flag=1;next} /^# /{if(flag) exit} flag{print}' "$declared_config_context_yaml")"
+  assert_contains "$declared_config_dependencies" "repo: example/runtime" "declared config repo: traces explicit root YAML manifest owner as dependency"
+  assert_not_contains "$(cat "$declared_config_context_yaml")" "path: source-notes.yaml" "declared config repo: does not promote source comments alone to manifest"
 
   mkdir -p "$WORKFLOW_CONTRACT_REPO/.github/workflows"
   git -C "$WORKFLOW_CONTRACT_REPO" init >/dev/null 2>&1

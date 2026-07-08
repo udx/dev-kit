@@ -1,5 +1,12 @@
 # Changes
 
+### 0.20.0
+
+- Discover root YAML config contracts from explicit top-level `contract` / `contracts` metadata or typed `kind` + `version` manifests instead of filename-specific allowlists.
+- Remove the deprecated worker-deployment `deploy.yml` surface and keep manifest discovery/dependency tracing covered by arbitrary typed root YAML such as `work-conf.yaml`.
+- Add an explicit `env-interface.yaml` for dev.kit's own environment contract so config coverage comes from a repo-owned interface declaration.
+- Document release strategy and pre-actions so PRs check the published version first, reserve the next version, update `changes.md`, regenerate context, and validate before merge.
+
 ### 0.14.0
 
 - Ignore command examples from `docs/references/` when generating repo command contracts, preventing reference docs from creating misleading `build` or `run` commands.
