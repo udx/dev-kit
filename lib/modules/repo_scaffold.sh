@@ -991,7 +991,10 @@ EOF
 
     # Source 4b: Versioned manifests declared by repo contract sections
     local _manifest_contract_files_file
-    _manifest_contract_files_file="$(mktemp "${TMPDIR:-/tmp}/dev-kit-manifest-contract-files.XXXXXX")"
+    _manifest_contract_files_file="$(mktemp "${TMPDIR:-/tmp}/dev-kit-manifest-contract-files.XXXXXX")" || {
+      rm -f "$_dep_triples_file"
+      return 1
+    }
 
     while IFS= read -r _manifest_dir; do
       [ -n "$_manifest_dir" ] && [ -d "${repo_root}/${_manifest_dir}" ] || continue
@@ -1036,6 +1039,7 @@ EOF
         fi
       fi
     done
+    rm -f "$_manifest_contract_files_file"
 
     # Normalize dependency identifiers so multiple evidence types can collapse
     # into a single repo-level dependency entry.
