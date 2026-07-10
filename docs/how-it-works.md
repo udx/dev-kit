@@ -1,6 +1,6 @@
 # How It Works
 
-`dev.kit` turns repo-declared structure into a working repo contract.
+`dev.kit` turns repo-declared structure into context coverage for repo handoffs.
 
 The default starting point is:
 

@@ -2,13 +2,15 @@
 
 <https://udx.dev/kit>
 
-`dev.kit` turns repositories into self-explaining repo contracts for humans, scripts, and CI/CD.
+`dev.kit` provides repo context coverage for every handoff.
+
+It reads repo-owned docs, manifests, workflows, commands, dependencies, and gaps, then writes `.rabbit/context.yaml` so humans, agents, scripts, and CI/CD systems such as Rabbit CI can work from the same declared contract.
 
 It helps teams and repositories:
 
 1. understand how the repo actually works
 2. keep repo standards, manifests, refs, and dependency contracts traceable
-3. regenerate reliable context from repo signals instead of tribal knowledge
+3. regenerate reliable handoff context from repo signals instead of tribal knowledge
 
 The model is:
 
