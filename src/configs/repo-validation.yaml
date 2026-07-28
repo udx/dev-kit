@@ -25,5 +25,5 @@ config:
       repo: udx/github-rabbit-action
       purpose: action, docs, and workflow context mix
     dev_kit:
-      repo: udx/dev.kit
+      repo: udx/rabbit-repo
       purpose: self-hosting sanity check

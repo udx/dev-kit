@@ -1,14 +1,14 @@
 {
   "name": "@udx/dev-kit",
-  "version": "0.20.1",
+  "version": "0.20.2",
   "description": "Context-driven engineering toolkit for AI agents and developers",
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/udx/dev.kit.git"
+    "url": "https://github.com/udx/rabbit-repo.git"
   },
-  "homepage": "https://github.com/udx/dev.kit",
-  "bugs": "https://github.com/udx/dev.kit/issues",
+  "homepage": "https://github.com/udx/rabbit-repo",
+  "bugs": "https://github.com/udx/rabbit-repo/issues",
   "scripts": {
     "postinstall": "if [ \"$npm_config_global\" = \"true\" ]; then bash bin/scripts/npm-postinstall.sh || true; fi"
   },

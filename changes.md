@@ -1,5 +1,9 @@
 # Changes
 
+### 0.20.2
+
+- Rename the public source repository from `udx/dev.kit` to `udx/rabbit-repo`, reflecting Rabbit CI's repository-enablement role through `.rabbit/` and generated context while keeping the `dev.kit` CLI/package surfaces stable.
+
 ### 0.20.1
 
 - Keep declared root YAML contract discovery aligned with repo file filtering so gitignored local/private YAML is not promoted into generated context.
