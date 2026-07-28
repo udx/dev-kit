@@ -1,5 +1,9 @@
 # Changes
 
+### 0.20.2
+
+- Update public repository URLs and self-repo contract checks from `udx/dev.kit` to `udx/rabbit-ci-repo` while keeping the `dev.kit` CLI/package surfaces stable for existing users.
+
 ### 0.20.1
 
 - Keep declared root YAML contract discovery aligned with repo file filtering so gitignored local/private YAML is not promoted into generated context.

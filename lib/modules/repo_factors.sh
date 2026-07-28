@@ -737,7 +737,7 @@ dev_kit_repo_prefers_internal_references() {
   repo_slug="$(dev_kit_repo_current_slug "$repo_dir" "$repo_name" 2>/dev/null || true)"
   real_repo_dir="$(cd "$repo_dir" 2>/dev/null && pwd || true)"
 
-  [ "$real_repo_dir" = "$REPO_DIR" ] || { [ "$repo_slug" = "udx/dev.kit" ] && [ "$repo_name" = "dev.kit" ]; }
+  [ "$real_repo_dir" = "$REPO_DIR" ] || { [ "$repo_slug" = "udx/rabbit-ci-repo" ] && [ "$repo_name" = "dev.kit" ]; }
 }
 
 dev_kit_repo_reference_doc_default() {

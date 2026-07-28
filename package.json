@@ -5,10 +5,10 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/udx/dev.kit.git"
+    "url": "https://github.com/udx/rabbit-ci-repo.git"
   },
-  "homepage": "https://github.com/udx/dev.kit",
-  "bugs": "https://github.com/udx/dev.kit/issues",
+  "homepage": "https://github.com/udx/rabbit-ci-repo",
+  "bugs": "https://github.com/udx/rabbit-ci-repo/issues",
   "scripts": {
     "postinstall": "if [ \"$npm_config_global\" = \"true\" ]; then bash bin/scripts/npm-postinstall.sh || true; fi"
   },
