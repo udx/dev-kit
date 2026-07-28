@@ -805,14 +805,14 @@ dev_kit_context_yaml_write() {
     printf 'version: %s\n' "$(dev_kit_version_uri)"
     printf 'generator:\n'
     printf '  tool: dev.kit\n'
-    printf '  repo: https://github.com/udx/rabbit-ci-repo\n'
+    printf '  repo: https://github.com/udx/rabbit-repo\n'
     printf '  version: %s\n' "$(dev_kit_tool_version)"
     printf '  generated_at: %s\n' "$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
     printf '  sources:\n'
     printf '    homepage: https://udx.dev/kit\n'
-    printf '    repository: https://github.com/udx/rabbit-ci-repo\n'
+    printf '    repository: https://github.com/udx/rabbit-repo\n'
     printf '    package: https://www.npmjs.com/package/@udx/dev-kit\n'
-    printf '    installation: https://github.com/udx/rabbit-ci-repo/blob/latest/docs/installation.md\n\n'
+    printf '    installation: https://github.com/udx/rabbit-repo/blob/latest/docs/installation.md\n\n'
 
     printf 'repo:\n'
     printf '  name: %s\n'      "$_repo"

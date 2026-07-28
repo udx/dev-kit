@@ -2,7 +2,7 @@
 
 ### 0.20.2
 
-- Update public repository URLs and self-repo contract checks from `udx/dev.kit` to `udx/rabbit-ci-repo` while keeping the `dev.kit` CLI/package surfaces stable for existing users.
+- Rename the public source repository from `udx/dev.kit` to `udx/rabbit-repo`, reflecting Rabbit CI's repository-enablement role through `.rabbit/` and generated context while keeping the `dev.kit` CLI/package surfaces stable.
 
 ### 0.20.1
 

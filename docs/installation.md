@@ -3,7 +3,7 @@
 `dev.kit` supports two install paths:
 
 - `npm install -g @udx/dev-kit`
-- `curl -fsSL https://raw.githubusercontent.com/udx/rabbit-ci-repo/latest/bin/scripts/install.sh | bash`
+- `curl -fsSL https://raw.githubusercontent.com/udx/rabbit-repo/latest/bin/scripts/install.sh | bash`
 
 Whichever path you use last becomes the active install. The installer cleans up the other path first so one install owns `dev.kit` at a time.
 
@@ -24,7 +24,7 @@ Refresh `dev.kit` with the same install path you use already:
 npm install -g @udx/dev-kit
 
 # curl-managed install
-curl -fsSL https://raw.githubusercontent.com/udx/rabbit-ci-repo/latest/bin/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/udx/rabbit-repo/latest/bin/scripts/install.sh | bash
 ```
 
 The generated `.rabbit/context.yaml` contract assumes a current `dev.kit` install before you regenerate repo context.
@@ -44,7 +44,7 @@ This is the default path.
 Use curl when npm is not available or not desired:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/udx/rabbit-ci-repo/latest/bin/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/udx/rabbit-repo/latest/bin/scripts/install.sh | bash
 ```
 
 The curl installer creates:

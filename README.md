@@ -27,7 +27,7 @@ npm install -g @udx/dev-kit
 ```
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/udx/rabbit-ci-repo/latest/bin/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/udx/rabbit-repo/latest/bin/scripts/install.sh | bash
 ```
 
 ## Quick start
